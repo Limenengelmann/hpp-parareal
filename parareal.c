@@ -25,11 +25,10 @@ double* parareal(double start, double end, int ncoarse, int nfine,
     double *x_t_old  = (double*) malloc((ncoarse+1)*sizeof(double));
     double *x_t_new  = (double*) malloc((ncoarse+1)*sizeof(double));
     double *x_t_fine = (double*) malloc((ncoarse+1)*sizeof(double));
+    double *tmp_fine = (double*) malloc(ncoarse*(nfine+1)*sizeof(double));
     x_t_old[0] = x_0;
     x_t_new[0] = x_0;
     x_t_fine[0] = x_0;
-
-    gnuplot();
 
     double t = start;
     // Initial approximation
@@ -37,30 +36,39 @@ double* parareal(double start, double end, int ncoarse, int nfine,
         x_t_old[i+1] = coarse(t, x_t_old[i], hc, f);
         t += hc;
     }
+    DEBUG(DBPARAPLOT, gnuplot());
 
     // parareal iteration
     for (int K=0; K<ncoarse; K++) {
         // parallel fine steps
         t = start;
-        double x_t;
         for (int i=0; i<ncoarse-1; i++) {
-            x_t = x_t_old[i];
+            double x_t = x_t_old[i];
+            tmp_fine[(nfine+1)*i] = x_t;
             for (int j=0; j<nfine; j++) {
-                //DEBUG(true, assert(t+hf <= start + i*hc && "Step out of bound!"));
-                x_t = fine(t, x_t, hf, f);
+                tmp_fine[(nfine+1)*i+j+1] = fine(t, tmp_fine[(nfine+1)*i+j], hf, f);
+                x_t = tmp_fine[(nfine+1)*i+j+1];
                 t += hf;
             }
+            DEBUG(true, assert(fabs(t - (start + (i+1)*hc) <= 1e-14 && "Fine steps did not add up!")));
             x_t_fine[i+1] = x_t;
         }
-        write2file(start, hc, ncoarse, x_t_fine);
+
+#if DBPARAPLOT
+        // plot current solution
+        write2file(start, hc, ncoarse+1, x_t_fine);
+        // plot fine solutions
+        //write2file(start, hf, (nfine+1)*ncoarse, tmp_fine);
+        // "pause" iteration
+        char b;
+        scanf("%c", &b);
+#endif
 
         // corrections and sequential coarse steps
         // TODO currently limited to 1 step for coarse update
         t = start;
         for (int i=0; i<ncoarse; i++) {
-            x_t_new[i+1] = x_t_new[i] + x_t_fine[i] - x_t_old[i];
-            // coarse step
-            x_t_new[i+1] = coarse(t, x_t_new[i], hc, f);
+            x_t_new[i+1] = coarse(t, x_t_new[i], hc, f) + x_t_fine[i+1] - coarse(t, x_t_old[i], hc, f);
             t += hc;
         }
 

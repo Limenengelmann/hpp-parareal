@@ -12,9 +12,12 @@ set lmargin at screen 0.1
 set rmargin at screen 0.82
 set bmargin at screen 0.12
 set tmargin at screen 0.95
-do for [n=0:1]{
+
+do for [i=1:100000] {
     plot fname using 1:2
     replot exp(x)
-    pause mouse close
-    #pause 0.1
+    #pause mouse keypress
+    if (MOUSE_CHAR eq 'q') {
+        break
+    }
 }

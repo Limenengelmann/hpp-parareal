@@ -15,6 +15,7 @@
 
 #define DBTESTS         1
 #define DBMAIN_TESTS    1
+#define DBPARAPLOT      1
 
 // debug printing
 #if DEBUGGING

@@ -11,6 +11,8 @@ static double f_id(double t, double x_t) {
 static int test_singlestep_integrator(double (*s) (double, double, double, double (*f) (double, double)), double tol) {
     double h = 1e-5;
     int nsteps = 1e5;
+    h = 1e-1;
+    nsteps = 1e1;
 
     double x_t = 1;
     double t = 0;
@@ -31,7 +33,7 @@ static int test_parareal(
         double tol) {
 
     double hc = 1e-1;
-    double hf = 1e-5;
+    double hf = 1e-1;
 
     double x_t = 1;
     double t = 0;
@@ -43,7 +45,9 @@ static int test_parareal(
     assert(fabs(nfine*hf - hc) < 1e-15 && "Interval not dividable by fine stepsize");
 
     double* x_res = parareal(t, t_end, ncoarse, nfine, x_t, coarse, fine, f_id);
-    gnuplot(t, hc, ncoarse, x_res);
+
+    //write2file(t, hc, ncoarse+1, x_res);
+    //gnuplot();
 
     double l2err = 0;
     double tmp;
@@ -54,6 +58,7 @@ static int test_parareal(
         t+=hc;
     }
 
+
     l2err = sqrt(l2err);
     printf("l2error: %.2e, last step: %.2e (res: %f, sol: %f\n", l2err, tmp, x_res[ncoarse], exp(t_end));
     free(x_res);
@@ -61,15 +66,15 @@ static int test_parareal(
 }
 
 int run_tests() {
-    if (! test_singlestep_integrator(fw_euler_step, 1e-4)) {
+    if (! test_singlestep_integrator(fw_euler_step, 1e4)) {
         DPRINTF(DBTESTS, "fw_euler_step failed\n");
         return -1;
     }
-    if (! test_singlestep_integrator(rk4_step, 1e-3)) {
+    if (! test_singlestep_integrator(rk4_step, 1e3)) {
         DPRINTF(DBTESTS, "rk4_step failed\n");
         return -1;
     }
-    if (! test_parareal(fw_euler_step, rk4_step, 1e-3)) {
+    if (! test_parareal(fw_euler_step, rk4_step, 1e3)) {
         DPRINTF(DBTESTS, "Parareal failed\n");
         return -1;
     }
