@@ -15,7 +15,7 @@
 // w_time time passed since global reference point
 #define gtoc() (clock_gettime(CLOCK_REALTIME, &w_tic) == 0) * (((double)w_tic.tv_sec + w_tic.tv_nsec/1e9f) - g_tic)
 
-#define addTime(fp, id, t1, t2) fprintf(fp, "%.9f %d\n%.9f %d\n\n", t1, id, t2, id);
+#define addTime(fp, id, t1, t2) fprintf(fp, "%.9f %d\n%.9f %d\n\n5, t1, id, t2, id);
 
 // can be switched by Makefile
 #define DEBUGGING       1
