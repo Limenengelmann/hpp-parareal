@@ -13,8 +13,8 @@
 // can be switched by Makefile
 #define DEBUGGING       1
 
-#define DBTESTS         1
-#define DBMAIN_TESTS    1
+#define DBTESTS         0
+#define DBMAIN_TESTS    0
 #define DBPARAPLOT      1
 
 // debug printing
@@ -35,5 +35,7 @@
 #endif
 
 int run_tests();
+double f_cos(double t, double x_t);
+double f_id(double t, double x_t);
 
 #endif  // include guard

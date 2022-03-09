@@ -16,7 +16,7 @@ set tmargin at screen 0.95
 do for [i=1:100000] {
     plot fname using 1:2
     replot exp(x)
-    #pause mouse keypress
+    pause mouse keypress
     if (MOUSE_CHAR eq 'q') {
         break
     }

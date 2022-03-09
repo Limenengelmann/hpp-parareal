@@ -1,10 +1,11 @@
 #include "tests.h"
 
-static double f_cos(double t, double x_t) {
+double f_cos(double t, double x_t) {
     return cos(t);
 }
 
-static double f_id(double t, double x_t) {
+double f_id(double t, double x_t) {
+    usleep(300);
     return x_t;
 }
 
@@ -44,7 +45,7 @@ static int test_parareal(
     int nfine = (hc) / hf;
     assert(fabs(nfine*hf - hc) < 1e-15 && "Interval not dividable by fine stepsize");
 
-    double* x_res = parareal(t, t_end, ncoarse, nfine, x_t, coarse, fine, f_id);
+    double* x_res = parareal(t, t_end, ncoarse, nfine, 4, x_t, coarse, fine, f_id);
 
     //write2file(t, hc, ncoarse+1, x_res);
     //gnuplot();
@@ -57,7 +58,6 @@ static int test_parareal(
         l2err += tmp*tmp;
         t+=hc;
     }
-
 
     l2err = sqrt(l2err);
     printf("l2error: %.2e, last step: %.2e (res: %f, sol: %f\n", l2err, tmp, x_res[ncoarse], exp(t_end));
