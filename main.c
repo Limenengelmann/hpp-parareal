@@ -4,9 +4,8 @@
 #include "parareal.h"
 #include "tests.h"
 
-#define tic() (tic = (clock_gettime(CLOCK_REALTIME, &w_tic) == 0 /*assert that call succeeded*/ ) * ((double)w_tic.tv_sec + w_tic.tv_nsec/1e9f))
-// return time since tic()
-#define toc() (clock_gettime(CLOCK_REALTIME, &w_tic) == 0) * (((double)w_tic.tv_sec + w_tic.tv_nsec/1e9f) - tic)
+double g_tic = 0;   // global time reference point
+extern double g_tic;
 
 int main(int argc, char** argv) {
 #if DBMAIN_TESTS
@@ -15,17 +14,19 @@ int main(int argc, char** argv) {
         return -1;
     }
 #endif
-    struct timespec w_tic;
-    double tic;
-
-    double t;
 
     int num_threads = 4;
+    int ncoarse = 1<<9;
     if (argc >= 2)
         num_threads = atoi(argv[1]);
+    if (argc >= 3)
+        ncoarse = atoi(argv[2]);
 
-    int work = 1024;
-    int ncoarse = 10;
+    struct timespec w_tic;
+    double tic;
+    g_tic = tic();  // start global timer
+
+    int work = 1<<10;
     int nfine   = round(work/num_threads);
     assert(fabs(nfine*num_threads - work) < 1e-15 && "Work not dividable by num_threads");
 
@@ -33,6 +34,7 @@ int main(int argc, char** argv) {
     double t_start = 0;
     double t_end   = 1;
     double slice = (t_end - t_start)/num_threads;
+    double t;
 
     double hc = slice/ncoarse;
     double hf = slice/nfine;

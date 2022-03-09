@@ -10,6 +10,8 @@
 #include "tests.h"
 #include "plot.h"
 
+extern double g_tic;
+
 typedef double (*rhs_func) (double t, double y_t);
 typedef double (*singlestep_func) (double t, double y_t, double h, rhs_func f);
 

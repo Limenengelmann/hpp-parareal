@@ -1,10 +1,10 @@
 #include "parareal.h"
 
-double fw_euler_step(double t, double y_t, double h, rhs_func f) {
+inline double fw_euler_step(double t, double y_t, double h, rhs_func f) {
     return y_t + h*f(t, y_t);
 }
 
-double rk4_step(double t, double y_t, double h, rhs_func f) {
+inline double rk4_step(double t, double y_t, double h, rhs_func f) {
     double k1 = f(t, y_t);
     double k2 = f(t+h/2, y_t + h*k1/2);
     double k3 = f(t+h/2, y_t + h*k2/2);
@@ -17,9 +17,12 @@ typedef struct task_data {
     int nfine, id;
     rhs_func f;
     singlestep_func fine;
+    FILE* timings;
 } task_data;
 
 void* task(void* args) {
+    struct timespec w_tic;
+    double tic = gtoc();
     task_data* td = (task_data*) args;
     double y_t = td->y_t;
     for (int j=0; j<td->nfine; j++) {
@@ -27,6 +30,7 @@ void* task(void* args) {
         td->t += td->hf;
     }
     td->y_t = y_t;
+    addTime(td->timings, td->id, tic, gtoc());
     return NULL;
 }
 
@@ -34,6 +38,16 @@ void* task(void* args) {
 // TODO add numthreads as arg
 double* parareal(double start, double end, int ncoarse, int nfine, int num_threads,
         double y_0, singlestep_func coarse, singlestep_func fine, rhs_func f) {
+
+    // init time measurements
+    FILE* timings = fopen("outdata/timings.data", "w");
+    if (! timings) {
+        perror("Couldn't open timings.data");
+        return NULL;
+    }
+    int id = 0;  // main thread #0
+    struct timespec w_tic;
+    double tic = gtoc();
 
     double slice = (end-start)/num_threads;
     double hc = slice/ncoarse;
@@ -57,11 +71,13 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         }
         y_t_old[i+1] = y_old;
     }
+    addTime(timings, id, tic, gtoc());
     //gnuplot();
 
     // parareal iteration
     for (int K=0; K<2; K++) {
         // parallel fine steps
+        tic = gtoc();
         t = start;
 
         pthread_t threads[num_threads];
@@ -74,13 +90,20 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             td[i].nfine = nfine;
             td[i].f = f;
             td[i].fine = fine;
-            td[i].id = i;
+            td[i].id = i+1;
+            td[i].timings = timings;
             pthread_create(threads+i, NULL, task, (void*) &td[i]);
             t += slice;
         }
-
+        addTime(timings, id, tic, gtoc());
+        
+        // wait for threads to finish
         for (int i=0; i<num_threads; i++) {
             pthread_join(threads[i], NULL);
+        }
+
+        tic = gtoc();
+        for (int i=0; i<num_threads; i++) {
             y_t_fine[i+1] = td[i].y_t;
         }
 
@@ -104,6 +127,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         }
         // new -> old
         memcpy(y_t_old+1, y_t_new+1, num_threads*sizeof(double));
+        addTime(timings, id, tic, gtoc());
     }
     free(y_t_old );
     free(y_t_fine);

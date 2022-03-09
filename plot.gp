@@ -4,9 +4,9 @@ set autoscale xfixmin   # axis range automatically scaled to
                         # include the range
 set autoscale xfixmax   # of data to be plotted
 
-set tics font ",18"
-set xlabel "x" font ",18"
-set ylabel "y" font ",18"
+#set tics font ",18"
+#set xlabel "x" font ",18"
+#set ylabel "y" font ",18"
 
 set lmargin at screen 0.1
 set rmargin at screen 0.82
