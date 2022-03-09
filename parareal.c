@@ -1,10 +1,10 @@
 #include "parareal.h"
 
-double fw_euler_step(double t, double y_t, double h, double (*f) (double, double)) {
+double fw_euler_step(double t, double y_t, double h, rhs_func f) {
     return y_t + h*f(t, y_t);
 }
 
-double rk4_step(double t, double y_t, double h, double (*f) (double, double)) {
+double rk4_step(double t, double y_t, double h, rhs_func f) {
     double k1 = f(t, y_t);
     double k2 = f(t+h/2, y_t + h*k1/2);
     double k3 = f(t+h/2, y_t + h*k2/2);
@@ -15,8 +15,8 @@ double rk4_step(double t, double y_t, double h, double (*f) (double, double)) {
 typedef struct task_data {
     double t, y_t, hf;
     int nfine, id;
-    double (*f) (double, double);
-    double (*fine) (double, double, double, double (*f) (double, double));
+    rhs_func f;
+    singlestep_func fine;
 } task_data;
 
 void* task(void* args) {
@@ -33,10 +33,7 @@ void* task(void* args) {
 // TODO proper malloc/free symmetry by passing buffers as arguments
 // TODO add numthreads as arg
 double* parareal(double start, double end, int ncoarse, int nfine, int num_threads,
-        double y_0,
-        double (*coarse) (double, double, double, double (*f) (double, double)),
-        double (*fine)   (double, double, double, double (*f) (double, double)),
-        double (*f) (double, double)) {
+        double y_0, singlestep_func coarse, singlestep_func fine, rhs_func f) {
 
     double slice = (end-start)/num_threads;
     double hc = slice/ncoarse;
@@ -60,9 +57,10 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         }
         y_t_old[i+1] = y_old;
     }
+    //gnuplot();
 
     // parareal iteration
-    for (int K=0; K<num_threads; K++) {
+    for (int K=0; K<2; K++) {
         // parallel fine steps
         t = start;
 
@@ -78,13 +76,18 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             td[i].fine = fine;
             td[i].id = i;
             pthread_create(threads+i, NULL, task, (void*) &td[i]);
-            t += hc;
+            t += slice;
         }
 
         for (int i=0; i<num_threads; i++) {
             pthread_join(threads[i], NULL);
             y_t_fine[i+1] = td[i].y_t;
         }
+
+        //write2file(start, slice, num_threads+1, y_t_fine);
+        //char b;
+        //scanf("%c", &b);
+
 
         // corrections and sequential coarse steps
         // TODO currently limited to 1 step for coarse update
@@ -100,7 +103,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             y_t_new[i+1] = y_new + y_t_fine[i+1] - y_old;
         }
         // new -> old
-        memcpy(y_t_old+1, y_t_new+1, ncoarse*sizeof(double));
+        memcpy(y_t_old+1, y_t_new+1, num_threads*sizeof(double));
     }
     free(y_t_old );
     free(y_t_fine);

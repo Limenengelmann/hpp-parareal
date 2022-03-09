@@ -9,7 +9,7 @@ double f_id(double t, double x_t) {
     return x_t;
 }
 
-static int test_singlestep_integrator(double (*s) (double, double, double, double (*f) (double, double)), double tol) {
+static int test_singlestep_integrator(singlestep_func s, double tol) {
     double h = 1e-5;
     int nsteps = 1e5;
     h = 1e-1;
@@ -28,10 +28,7 @@ static int test_singlestep_integrator(double (*s) (double, double, double, doubl
 }
 
 // TODO depends too much on hc and doesnt seem to converge to fine integr precision
-static int test_parareal(
-        double (*coarse) (double, double, double, double (*f) (double, double)),
-        double (*fine) (double, double, double, double (*f) (double, double)),
-        double tol) {
+static int test_parareal(singlestep_func coarse, singlestep_func fine, double tol) {
 
     double hc = 1e-1;
     double hf = 1e-1;
@@ -67,15 +64,15 @@ static int test_parareal(
 
 int run_tests() {
     if (! test_singlestep_integrator(fw_euler_step, 1e4)) {
-        DPRINTF(DBTESTS, "fw_euler_step failed\n");
+        DPRINTF(true, "fw_euler_step failed\n");
         return -1;
     }
     if (! test_singlestep_integrator(rk4_step, 1e3)) {
-        DPRINTF(DBTESTS, "rk4_step failed\n");
+        DPRINTF(true, "rk4_step failed\n");
         return -1;
     }
     if (! test_parareal(fw_euler_step, rk4_step, 1e3)) {
-        DPRINTF(DBTESTS, "Parareal failed\n");
+        DPRINTF(true, "Parareal failed\n");
         return -1;
     }
     return 0;

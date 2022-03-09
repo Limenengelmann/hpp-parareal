@@ -10,16 +10,18 @@
 #include "tests.h"
 #include "plot.h"
 
+typedef double (*rhs_func) (double t, double y_t);
+typedef double (*singlestep_func) (double t, double y_t, double h, rhs_func f);
 
-double fw_euler_step(double t, double x_t, double h, double (*f) (double, double));
+double fw_euler_step(double t, double y_t, double h, rhs_func f);
 
-double rk4_step(double t, double x_t, double h, double (*f) (double, double));
+double rk4_step(double t, double y_t, double h, rhs_func f);
 
 // TODO data structure for fine and coarse solver?
 double* parareal(double start, double end, int ncoarse, int nfine, int num_threads,
         double y_0,
-        double (*coarse) (double, double, double, double (*f) (double, double)),
-        double (*fine) (double, double, double, double (*f) (double, double)),
-        double (*f) (double, double));
+        singlestep_func coarse,
+        singlestep_func fine,
+        rhs_func f);
 
 #endif // include guard
