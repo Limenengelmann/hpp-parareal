@@ -131,6 +131,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
     }
     free(y_t_old );
     free(y_t_fine);
+    fclose(timings);
 
     return y_t_new;
 }

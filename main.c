@@ -3,8 +3,8 @@
 #include <math.h>
 #include "parareal.h"
 #include "tests.h"
+#include "aux.h"
 
-double g_tic = 0;   // global time reference point
 extern double g_tic;
 
 int main(int argc, char** argv) {
@@ -14,21 +14,20 @@ int main(int argc, char** argv) {
         return -1;
     }
 #endif
-
-    int num_threads = 4;
     int ncoarse = 1<<9;
     if (argc >= 2)
-        num_threads = atoi(argv[1]);
-    if (argc >= 3)
         ncoarse = atoi(argv[2]);
+    int num_threads = 4;
+    if (argc >= 3)
+        num_threads = atoi(argv[1]);
 
     struct timespec w_tic;
     double tic;
     g_tic = tic();  // start global timer
 
-    int work = 1<<10;
-    int nfine   = round(work/num_threads);
-    assert(fabs(nfine*num_threads - work) < 1e-15 && "Work not dividable by num_threads");
+    int pwork = 1<<10;  // Total work to be parallelized
+    int nfine   = round(pwork/num_threads);
+    assert(fabs(nfine*num_threads - pwork) < 1e-15 && "Parallel Work not dividable by num_threads");
 
     double y_0 = 1;
     double t_start = 0;

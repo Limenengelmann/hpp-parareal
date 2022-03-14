@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include "tests.h"
-#include "plot.h"
+#include "aux.h"
 
 extern double g_tic;
 

@@ -1,4 +1,5 @@
-#include "plot.h"
+#include "aux.h"
+
 
 void write2file(double start, double h, int size, double *yt) {
     FILE* fp = fopen("./outdata/data.out", "w");

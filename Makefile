@@ -10,20 +10,20 @@ ASMFLAGS = -fverbose-asm
 LDFLAGS = $(PFLAGS) -lm -lpthread
 
 RM = rm -f
-OBJS = main.o parareal.o tests.o plot.o
+OBJS = main.o parareal.o tests.o aux.o
 NAME = main
 
 main: $(OBJS)
 	$(LD) $(OPT) $(OBJS) $(LDFLAGS) -o $@
 
-main.o: main.c tests.h parareal.h plot.h
+main.o: main.c tests.h parareal.h aux.h
 	$(CC) $(CFLAGS) -c main.c
 
 tests.o: tests.h parareal.h tests.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c tests.c
 
-plot.o: plot.c
-	$(CC) $(CFLAGS) -c plot.c
+aux.o: aux.c
+	$(CC) $(CFLAGS) -c aux.c
 
 parareal.o: parareal.h tests.h parareal.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c parareal.c
