@@ -1,5 +1,10 @@
 reset
-work = "outdata/timings.data"
+
+print "script             : ", ARG0
+print "Ploting file       : ", ARG1
+print "number of arguments: ", ARGC
+
+work=ARG1
 
 set yrange [-0.5:8.5]
 set autoscale xfixmin   # axis range automatically scaled to 
@@ -13,7 +18,7 @@ set bmargin at screen 0.12
 set tmargin at screen 0.95
 
 set xlabel "time (s)"
-set ylabel "core id"
+set ylabel "thread id"
 
 # Set linestyle 1 to blue (#0060ad)
 set style line 1 \
@@ -23,7 +28,7 @@ set style line 1 \
 
 set key outside
 set format x "%2.1f"
-set xtics  0,0.5,32
+set xtics  0,0.1,32
 set ytics  0,1,32
 
 do for [i=1:100000] {

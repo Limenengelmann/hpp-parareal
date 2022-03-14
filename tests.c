@@ -1,5 +1,7 @@
 #include "tests.h"
 
+extern double g_tic;    // global time reference point
+
 double f_cos(double t, double x_t) {
     return cos(t);
 }
@@ -41,8 +43,9 @@ static int test_parareal(singlestep_func coarse, singlestep_func fine, double to
     assert(fabs(ncoarse*hc - (t_end-t)) < 1e-15 && "Interval not dividable by coarse stepsize");
     int nfine = (hc) / hf;
     assert(fabs(nfine*hf - hc) < 1e-15 && "Interval not dividable by fine stepsize");
+    int piters = 2;
 
-    double* x_res = parareal(t, t_end, ncoarse, nfine, 4, x_t, coarse, fine, f_id);
+    double* x_res = parareal(t, t_end, ncoarse, nfine, 4, x_t, coarse, fine, f_id, piters);
 
     //write2file(t, hc, ncoarse+1, x_res);
     //gnuplot();

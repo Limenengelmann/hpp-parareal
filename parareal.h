@@ -24,6 +24,6 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         double y_0,
         singlestep_func coarse,
         singlestep_func fine,
-        rhs_func f);
+        rhs_func f, int piters);
 
 #endif // include guard

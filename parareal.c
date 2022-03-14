@@ -1,5 +1,7 @@
 #include "parareal.h"
 
+extern double g_tic;    // global time reference point
+
 inline double fw_euler_step(double t, double y_t, double h, rhs_func f) {
     return y_t + h*f(t, y_t);
 }
@@ -30,17 +32,19 @@ void* task(void* args) {
         td->t += td->hf;
     }
     td->y_t = y_t;
-    addTime(td->timings, td->id, tic, gtoc());
+    addTime2Plot(td->timings, td->id, tic, gtoc());
     return NULL;
 }
 
 // TODO proper malloc/free symmetry by passing buffers as arguments
 // TODO add numthreads as arg
 double* parareal(double start, double end, int ncoarse, int nfine, int num_threads,
-        double y_0, singlestep_func coarse, singlestep_func fine, rhs_func f) {
+        double y_0, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
 
     // init time measurements
-    FILE* timings = fopen("outdata/timings.data", "w");
+    char fname[128];
+    sprintf(fname, "outdata/timings.t%d.pw%d.sw%d.data", num_threads, ncoarse, nfine);
+    FILE* timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
         return NULL;
@@ -71,11 +75,11 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         }
         y_t_old[i+1] = y_old;
     }
-    addTime(timings, id, tic, gtoc());
+    addTime2Plot(timings, id, tic, gtoc());
     //gnuplot();
 
     // parareal iteration
-    for (int K=0; K<2; K++) {
+    for (int K=0; K<piters; K++) {
         // parallel fine steps
         tic = gtoc();
         t = start;
@@ -95,7 +99,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             pthread_create(threads+i, NULL, task, (void*) &td[i]);
             t += slice;
         }
-        addTime(timings, id, tic, gtoc());
+        addTime2Plot(timings, id, tic, gtoc());
         
         // wait for threads to finish
         for (int i=0; i<num_threads; i++) {
@@ -127,7 +131,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         }
         // new -> old
         memcpy(y_t_old+1, y_t_new+1, num_threads*sizeof(double));
-        addTime(timings, id, tic, gtoc());
+        addTime2Plot(timings, id, tic, gtoc());
     }
     free(y_t_old );
     free(y_t_fine);

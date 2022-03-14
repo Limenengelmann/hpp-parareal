@@ -19,13 +19,13 @@ main: $(OBJS)
 main.o: main.c tests.h parareal.h aux.h
 	$(CC) $(CFLAGS) -c main.c
 
-tests.o: tests.h parareal.h tests.c
+tests.o: tests.h parareal.h aux.h tests.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c tests.c
 
 aux.o: aux.c
 	$(CC) $(CFLAGS) -c aux.c
 
-parareal.o: parareal.h tests.h parareal.c
+parareal.o: parareal.h tests.h aux.h parareal.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c parareal.c
 
 debug%:

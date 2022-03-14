@@ -5,7 +5,7 @@
 #include "tests.h"
 #include "aux.h"
 
-extern double g_tic;
+extern double g_tic;    // global time reference point
 
 int main(int argc, char** argv) {
 #if DBMAIN_TESTS
@@ -14,12 +14,20 @@ int main(int argc, char** argv) {
         return -1;
     }
 #endif
+
     int ncoarse = 1<<9;
     if (argc >= 2)
-        ncoarse = atoi(argv[2]);
-    int num_threads = 4;
+        ncoarse = atoi(argv[1]);
+    int piters = 2;
     if (argc >= 3)
-        num_threads = atoi(argv[1]);
+        piters = atoi(argv[2]);
+    int num_threads = 4;
+    if (argc >= 4)
+        num_threads = atoi(argv[3]);
+    if (piters > num_threads) {
+        // TODO num_threads or num_threads-1?
+        printf("Warning: Parareal converges after at most %d p-iterations with %d threads\n", num_threads, num_threads);
+    }
 
     struct timespec w_tic;
     double tic;
@@ -39,7 +47,7 @@ int main(int argc, char** argv) {
     double hf = slice/nfine;
 
     tic();
-    double* y_res = parareal(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id);
+    double* y_res = parareal(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
     double time_para = toc();
 
     t = t_start;
@@ -63,8 +71,9 @@ int main(int argc, char** argv) {
 
     double speedup = time_serial/time_para;
     printf("Parareal l2error: %.2e, last step: %.2e (res: %f, sol: %f)\n", l2err, tmp, y_res[num_threads], exp(t-slice));
+    printf("Threads: %d, total fine integrator steps: %d, coarse steps: %d\n", num_threads, pwork, ncoarse);
     printf("Times: parar %.2fs, rk4 %.2fs\n", time_para, time_serial);
-    printf("Speedup: %.2f, Efficiency: %.2f\n", time_serial/time_para, 
+    printf("Speedup: %.2f, Efficiency: %.2f\n", speedup, 
             speedup/num_threads);
 
     //write2file(t_start, hc, num_threads+1, y_res);
