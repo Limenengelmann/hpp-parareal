@@ -15,27 +15,69 @@ inline double rk4_step(double t, double y_t, double h, rhs_func f) {
 }
 
 typedef struct task_data {
-    double t, y_t, hf;
-    int nfine, id;
+    double t, y, hc, hf;
+    double *y_next;
+    int nfine, ncoarse, id;
     rhs_func f;
     singlestep_func fine;
+    singlestep_func coarse;
     FILE* timings;
 } task_data;
 
+// TODO update task to new pipeline version
 void* task(void* args) {
     struct timespec w_tic;
     double tic = gtoc();
     task_data* td = (task_data*) args;
-    double y_t = td->y_t;
+#if 0 
+    double y_t = td->y;
     for (int j=0; j<td->nfine; j++) {
         y_t = td->fine(td->t, y_t, td->hf, td->f);
         td->t += td->hf;
     }
-    td->y_t = y_t;
+    td->y = y_t;
+    addTime2Plot(td->timings, td->id, tic, gtoc());
+    return NULL;
+
+#endif
+    double t, y_coarse, y_fine, y_next;
+    double hc = td->hc;
+    double hf = td->hf;
+
+
+    // parallel coarse step
+    t = td->t;
+    y_coarse = td->y;
+    for (int i=0; i<td->ncoarse; i++) {
+        y_coarse = td->coarse(t, y_coarse, hc, td->f);
+        t += hc;
+    }
+
+    // parallel fine step
+    t = td->t;
+    y_fine = td->y;
+    for (int i=0; i<td->nfine; i++) {
+        y_fine = td->fine(t, y_fine, hf, td->f);
+        t += hf;
+    }
+
+    // serial coarse propagation step + parareal update
+    t = td->t;
+    y_next = td->y_next[td->id];  // TODO guarantee y_next is uptodate (sync)
+    for (int i=0; i<td->ncoarse; i++) {
+        y_next = td->coarse(t, y_next, hc, td->f);
+        t += hc;
+    }
+    // parareal update
+    // TODO just accumulate result directly in y_next?
+    y_next = y_next + y_fine - y_coarse;
+    td->y_next[td->id+1] = y_next;
+
     addTime2Plot(td->timings, td->id, tic, gtoc());
     return NULL;
 }
 
+// TODO plot idea: speedup vs relative serial work/total work
 // TODO proper malloc/free symmetry by passing buffers as arguments
 // TODO add numthreads as arg
 double* parareal(double start, double end, int ncoarse, int nfine, int num_threads,
@@ -61,11 +103,27 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
     double *y_t_new  = (double*) malloc((num_threads+1)*sizeof(double));
     double *y_t_fine = (double*) malloc((num_threads+1)*sizeof(double));
 
+    double *y       = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
+    double *y_next  = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
+    double *y_fine  = (double*) malloc((num_threads+1)*sizeof(double)); // fine sol
+    double *y_c_old = (double*) malloc((num_threads+1)*sizeof(double)); // old coarse sol
+    double *y_c_new = (double*) malloc((num_threads+1)*sizeof(double)); // new corase sol
+    // TODO synchronisation: when thread i prepared y_next[i+1]
+    // flag buffer? done[i]->1 thread i+1-> works and sets done[i]->0
+    // possible race condition?
+    //char progress[num_threads] = {0};
+
+    y[0]       = y_0;
+    y_next[0]  = y_0;
+    y_fine[0]  = y_0;
+    y_c_old[0] = y_0;
+    y_c_new[0] = y_0;
+
     y_t_old[0]  = y_0;
     y_t_new[0]  = y_0;
     y_t_fine[0] = y_0;
 
-    double y_new, y_old = y_0;
+    double y_old = y_0;
     double t = start;
     // Initial approximation
     for (int i=0; i<num_threads; i++) {
@@ -73,43 +131,73 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             y_old = coarse(t, y_old, hc, f);
             t += hc;
         }
-        y_t_old[i+1] = y_old;
+        y_c_old[i+1] = y_old;
     }
     addTime2Plot(timings, id, tic, gtoc());
     //gnuplot();
+    
 
     // parareal iteration
     for (int K=0; K<piters; K++) {
         // parallel fine steps
-        tic = gtoc();
-        t = start;
 
         pthread_t threads[num_threads];
         task_data td[num_threads];
 
-        for(int i = 0; i < num_threads; i++) {
+        // TODO only create threads once
+#if 1
+        t = start+slice;
+        for(int i = 1; i < num_threads; i++) {
+            // TODO pass y_fine pointer, then write result directly ?
+            // how to slim this down ? only t and y change per iteration
             td[i].t = t;
-            td[i].y_t = y_t_old[i];
+            td[i].y = y[i];
+            td[i].y_next = y_next;
             td[i].hf = hf;
-            td[i].nfine = nfine;
+            td[i].hc = hc;
+            td[i].nfine   = nfine;
+            td[i].ncoarse = ncoarse;
             td[i].f = f;
-            td[i].fine = fine;
-            td[i].id = i+1;
+            td[i].fine   = fine;
+            td[i].coarse = coarse;
+            td[i].id = i;
             td[i].timings = timings;
             pthread_create(threads+i, NULL, task, (void*) &td[i]);
             t += slice;
         }
+#endif
+        // main thread works
+        tic = gtoc();
+        t = start;
+        y_c_old[1] = y[0];
+        for(int i=0; i < ncoarse; i++) {
+            y_c_old[1] = coarse(t, y_c_old[1], hc, f);
+            t += hc;
+        }
+        t = start;
+        y_fine[1] = y[0];
+        for (int i=0; i<nfine; i++) {
+            y_fine[1] = fine(t, y_fine[1], hf, f);
+            t += hf;
+        }
+        t = start;
+        y_c_new[1] = y_next[0];     // = y[0]
+        for (int i=0; i<ncoarse; i++) {
+            y_c_new[1] = coarse(t, y_c_new[1], hc, f);
+            t += hc;
+        }
+        // parareal update
+        // TODO just accumulate result directly in y_next?
+        y_next[1] = y_c_new[1] + y_fine[1] - y_c_old[1];
+
         addTime2Plot(timings, id, tic, gtoc());
         
+#if 1
         // wait for threads to finish
-        for (int i=0; i<num_threads; i++) {
+        for (int i=1; i<num_threads; i++) {
             pthread_join(threads[i], NULL);
         }
-
-        tic = gtoc();
-        for (int i=0; i<num_threads; i++) {
-            y_t_fine[i+1] = td[i].y_t;
-        }
+#endif
 
         //write2file(start, slice, num_threads+1, y_t_fine);
         //char b;
@@ -118,6 +206,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
 
         // corrections and sequential coarse steps
         // TODO currently limited to 1 step for coarse update
+        /*
         t = start;
         for (int i=0; i<num_threads; i++) {
             y_new = y_t_new[i];
@@ -129,13 +218,33 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             }
             y_t_new[i+1] = y_new + y_t_fine[i+1] - y_old;
         }
+        */
         // new -> old
-        memcpy(y_t_old+1, y_t_new+1, num_threads*sizeof(double));
-        addTime2Plot(timings, id, tic, gtoc());
+        // TODO check for proper updatetobias.lima-engelmann@it.uu.se
+        memcpy(y+1, y_next+1, num_threads*sizeof(double));
+        memcpy(y_c_old+1, y_c_new+1, num_threads*sizeof(double));
     }
+
+    for (int i=0; i<num_threads+1; i++)
+        printf("y[%d]: %f\n", i, y[i]);
+    for (int i=0; i<num_threads+1; i++)
+        printf("y_fine[%d]: %f\n", i, y_fine[i]);
+    for (int i=0; i<num_threads+1; i++)
+        printf("y_next[%d]: %f\n", i, y_next[i]);
+    for (int i=0; i<num_threads+1; i++)
+        printf("y_c_old[%d]: %f\n", i, y_c_old[i]);
+    for (int i=0; i<num_threads+1; i++)
+        printf("y_c_new[%d]: %f\n", i, y_c_new[i]);
+
     free(y_t_old );
     free(y_t_fine);
+
+    free(y_next );
+    free(y_fine );
+    free(y_c_old);
+    free(y_c_new);
+
     fclose(timings);
 
-    return y_t_new;
+    return y;
 }

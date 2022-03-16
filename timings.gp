@@ -31,6 +31,7 @@ set format x "%2.1f"
 set xtics  0,0.1,32
 set ytics  0,1,32
 
+#TODO plot pure lines instead of lines with point ends
 do for [i=1:100000] {
     plot work with linespoints linestyle 1
     replot

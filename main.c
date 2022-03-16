@@ -14,16 +14,22 @@ int main(int argc, char** argv) {
         return -1;
     }
 #endif
+    if (argc < 2) {
+        printf("Usage: %s num_threads [coarse-steps-per-interval] [parareal-iters]\n", argv[0]);
+        return -1;
+    }
 
-    int ncoarse = 1<<9;
+    int num_threads = 1;
     if (argc >= 2)
-        ncoarse = atoi(argv[1]);
-    int piters = 2;
+        num_threads = atoi(argv[1]);
+    num_threads = num_threads > 0 ? num_threads : 1;    // cant run with 0 threads
+                                                        // (main is also one)
+    int ncoarse = 1<<9;
     if (argc >= 3)
-        piters = atoi(argv[2]);
-    int num_threads = 4;
+        ncoarse = atoi(argv[2]);
+    int piters = 2;
     if (argc >= 4)
-        num_threads = atoi(argv[3]);
+        piters = atoi(argv[3]);
     if (piters > num_threads) {
         // TODO num_threads or num_threads-1?
         printf("Warning: Parareal converges after at most %d p-iterations with %d threads\n", num_threads, num_threads);
@@ -71,13 +77,13 @@ int main(int argc, char** argv) {
 
     double speedup = time_serial/time_para;
     printf("Parareal l2error: %.2e, last step: %.2e (res: %f, sol: %f)\n", l2err, tmp, y_res[num_threads], exp(t-slice));
-    printf("Threads: %d, total fine integrator steps: %d, coarse steps: %d\n", num_threads, pwork, ncoarse);
+    printf("Threads: %d, total fine integrator steps: %d, coarse steps (per slice): %d\n", num_threads, pwork, ncoarse);
     printf("Times: parar %.2fs, rk4 %.2fs\n", time_para, time_serial);
     printf("Speedup: %.2f, Efficiency: %.2f\n", speedup, 
             speedup/num_threads);
 
-    //write2file(t_start, hc, num_threads+1, y_res);
-    //gnuplot();
+    write2file(t_start, slice, num_threads+1, y_res);
+    gnuplot();
 
     free(y_res);
 
