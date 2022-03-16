@@ -30,17 +30,7 @@ void* task(void* args) {
     struct timespec w_tic;
     double tic = gtoc();
     task_data* td = (task_data*) args;
-#if 0 
-    double y_t = td->y;
-    for (int j=0; j<td->nfine; j++) {
-        y_t = td->fine(td->t, y_t, td->hf, td->f);
-        td->t += td->hf;
-    }
-    td->y = y_t;
-    addTime2Plot(td->timings, td->id, tic, gtoc());
-    return NULL;
 
-#endif
     double t, y_coarse, y_fine, y_next;
     double hc = td->hc;
     double hf = td->hf;
@@ -61,10 +51,12 @@ void* task(void* args) {
         y_fine = td->fine(t, y_fine, hf, td->f);
         t += hf;
     }
+    addTime2Plot(td->timings, td->id, tic, gtoc());
 
-    while (td->progress[td->id-1] != 1) {
-    }
+    // wait for previous thread to update y_next
+    while (td->progress[td->id-1] != 1);    
     
+    tic = gtoc();
     // serial coarse propagation step + parareal update
     t = td->t;
     y_next = td->y_next[td->id];  // TODO guarantee y_next is uptodate (sync)
