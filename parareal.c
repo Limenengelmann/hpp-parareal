@@ -18,6 +18,7 @@ typedef struct task_data {
     double t, y, hc, hf;
     double *y_next;
     int nfine, ncoarse, id;
+    volatile char *progress;    // pointer to volatile char
     rhs_func f;
     singlestep_func fine;
     singlestep_func coarse;
@@ -61,6 +62,9 @@ void* task(void* args) {
         t += hf;
     }
 
+    while (td->progress[td->id-1] != 1) {
+    }
+    
     // serial coarse propagation step + parareal update
     t = td->t;
     y_next = td->y_next[td->id];  // TODO guarantee y_next is uptodate (sync)
@@ -72,6 +76,7 @@ void* task(void* args) {
     // TODO just accumulate result directly in y_next?
     y_next = y_next + y_fine - y_coarse;
     td->y_next[td->id+1] = y_next;
+    td->progress[td->id] = 1;
 
     addTime2Plot(td->timings, td->id, tic, gtoc());
     return NULL;
@@ -85,7 +90,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
 
     // init time measurements
     char fname[128];
-    sprintf(fname, "outdata/timings.t%d.pw%d.sw%d.data", num_threads, ncoarse, nfine);
+    sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data", num_threads, ncoarse, piters);
     FILE* timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
@@ -111,7 +116,9 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
     // TODO synchronisation: when thread i prepared y_next[i+1]
     // flag buffer? done[i]->1 thread i+1-> works and sets done[i]->0
     // possible race condition?
-    //char progress[num_threads] = {0};
+    char progress[num_threads];
+    for (int i=0; i<num_threads; i++)
+        progress[i] = 0;
 
     y[0]       = y_0;
     y_next[0]  = y_0;
@@ -145,7 +152,6 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         task_data td[num_threads];
 
         // TODO only create threads once
-#if 1
         t = start+slice;
         for(int i = 1; i < num_threads; i++) {
             // TODO pass y_fine pointer, then write result directly ?
@@ -161,11 +167,11 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             td[i].fine   = fine;
             td[i].coarse = coarse;
             td[i].id = i;
+            td[i].progress = progress;
             td[i].timings = timings;
             pthread_create(threads+i, NULL, task, (void*) &td[i]);
             t += slice;
         }
-#endif
         // main thread works
         tic = gtoc();
         t = start;
@@ -189,6 +195,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         // parareal update
         // TODO just accumulate result directly in y_next?
         y_next[1] = y_c_new[1] + y_fine[1] - y_c_old[1];
+        progress[0] = 1;
 
         addTime2Plot(timings, id, tic, gtoc());
         
@@ -223,8 +230,11 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         // TODO check for proper updatetobias.lima-engelmann@it.uu.se
         memcpy(y+1, y_next+1, num_threads*sizeof(double));
         memcpy(y_c_old+1, y_c_new+1, num_threads*sizeof(double));
+        for (int i=0; i<num_threads; i++)
+            progress[i] = 0;
     }
 
+#if 0
     for (int i=0; i<num_threads+1; i++)
         printf("y[%d]: %f\n", i, y[i]);
     for (int i=0; i<num_threads+1; i++)
@@ -235,6 +245,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         printf("y_c_old[%d]: %f\n", i, y_c_old[i]);
     for (int i=0; i<num_threads+1; i++)
         printf("y_c_new[%d]: %f\n", i, y_c_new[i]);
+#endif
 
     free(y_t_old );
     free(y_t_fine);

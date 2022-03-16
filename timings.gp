@@ -28,7 +28,7 @@ set style line 1 \
 
 set key outside
 set format x "%2.1f"
-set xtics  0,0.1,32
+set xtics  0,0.5,32
 set ytics  0,1,32
 
 #TODO plot pure lines instead of lines with point ends

@@ -10,7 +10,7 @@ ASMFLAGS = -fverbose-asm
 LDFLAGS = $(PFLAGS) -lm -lpthread
 
 RM = rm -f
-OBJS = main.o parareal.o tests.o aux.o plot.o
+OBJS = main.o parareal.o tests.o aux.o
 NAME = main
 
 main: $(OBJS)

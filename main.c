@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
     double tic;
     g_tic = tic();  // start global timer
 
-    int pwork = 1<<10;  // Total work to be parallelized
+    const int pwork = 1<<10;  // Total work to be parallelized
     int nfine   = round(pwork/num_threads);
     assert(fabs(nfine*num_threads - pwork) < 1e-15 && "Parallel Work not dividable by num_threads");
 
