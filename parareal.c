@@ -65,9 +65,11 @@ void* task(void* args) {
         // FIXME race condition for 8 threads 85 steps 3 iterations
         // provoke racing conditions or lapping
 
-        // wait for previous thread to update y_next
-        while (td->progress[td->id-1] < K+1);    
-        usleep(td->id*300000);
+        // wait for previous thread to finish iteration and update y_next
+        DPRINTF(DBTHREADS, "#%d(K%d): Waiting for #%d to reach iter %d\n", td->id, K, td->id-1, K+1);
+        while (td->progress[td->id-1] < K+1);
+        DPRINTF(DBTHREADS, "#%d(K%d): Finished waiting, continuing.\n", td->id, K);
+        //if (td->id == 7) sleep(1);  // -> threads lap thread 7
         
         tic = gtoc();
         // serial coarse propagation step + parareal update
@@ -84,6 +86,7 @@ void* task(void* args) {
         y_next = y_next + y_fine - y_coarse;
         td->y_next[td->id+1] = y_next;
         td->progress[td->id]++;
+        DPRINTF(DBTHREADS, "#%d(K%d): Iter done. Start iter %d.\n", td->id, K, td->progress[td->id]);
 
         addTime2Plot(td->timings, td->id, tic, gtoc());
     }
@@ -119,7 +122,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
     double *y_next  = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
 
     // cheap "semaphores"
-    char progress[num_threads];
+    volatile char progress[num_threads];     // signals which iteration a thread is at
     for (int i=0; i<num_threads; i++)
         progress[i] = 0;
 
@@ -173,7 +176,9 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         // wait for last thread to at least finish the previous iteration
         // to keep threads "together" and prevent them from lapping each other
         // TODO test via variable runtime lengths dep on id?
+        DPRINTF(DBTHREADS, "#%d(K%d): Waiting for #%d to reach iter %d\n", id, K, num_threads-1, K);
         while (progress[num_threads-1] < K);
+        DPRINTF(DBTHREADS, "#%d(K%d): Finished waiting, continuing.\n", id, K);
 
         tic = gtoc();
         t = start;
@@ -186,6 +191,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         // TODO just accumulate result directly in y_next?
         y_next[1] = y_new_coarse + y_fine - y_coarse;
         progress[0]++;
+        DPRINTF(DBTHREADS, "#%d(K%d): Iter done. Start iter %d.\n", id, K, progress[id]);
 
         addTime2Plot(timings, id, tic, gtoc());
     }

@@ -15,13 +15,15 @@
 #define DBTESTS         0
 #define DBMAIN_TESTS    0
 #define DBPARAPLOT      1
+#define DBTHREADS       0
 
 // debug printing
 #if DEBUGGING
 // print debug info
+// two print statements are not thread-'atomic' anymore
 #define DPRINTF(DBFLAG, ...) \
     if (DBFLAG) { \
-        printf("DBG(%s): ", __func__); printf(__VA_ARGS__); \
+        /*printf("DBG(%s): ", __func__);*/ printf(__VA_ARGS__); \
     }
 // execute only when debugging (like assert statements)
 #define DEBUG(DBFLAG, ...) \

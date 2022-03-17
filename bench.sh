@@ -11,5 +11,5 @@ fi
 
 ### commands to run
 # racing condition
-main 8 85 3; 
+main 8 85 3;
 gnuplot -c timings.gp outdata/timings.t8.sw85.K3.data;
