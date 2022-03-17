@@ -203,3 +203,81 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
     fclose(timings);
     return y_next;
 }
+
+double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_threads,
+        double y0, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
+
+    double *y  = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
+    double *yc = (double*) malloc((num_threads+1)*sizeof(double)); // coarse solution
+    double *dy = (double*) malloc((num_threads+1)*sizeof(double)); // difference of above
+
+
+    double slice = (end-start)/num_threads;
+    double hc = slice/ncoarse;
+    double hf = slice/nfine;
+
+    y[0] = y0;
+
+    omp_lock_t locks[num_threads];
+    for (int i=0; i<num_threads; i++) {
+        omp_init_lock(locks+i);
+    }
+
+    omp_set_num_threads(num_threads);
+    int P = num_threads;
+    #pragma omp parallel 
+    {
+        #pragma omp for nowait schedule(static)
+        for (int p=0; p<P; p++) {
+            y[p] = y[0];
+            double t = start;
+            // TODO if cond can be removed
+            if (p>0 /*not first thread*/) {
+                for (int i=0; i<p*ncoarse; i++) {
+                    y[p] = coarse(t, y[p], hc, f);
+                    t += hc;
+                }
+            }
+            yc[p] = y[p];
+            for (int i=0; i<ncoarse; i++) {
+                yc[p] = coarse(t, yc[p], hc, f);
+                t+=hc;
+            }
+        }
+
+        for (int k=0; k<piters; k++) {
+            #pragma omp for ordered nowait schedule(static)
+            for (int p=0; p<P; p++) {
+                double t = slice*p;
+                omp_set_lock(locks+p);
+                for (int i=0; i<nfine; i++) {
+                    y[p] = fine(t, y[p], hf, f);
+                    t += hf;
+                }
+                dy[p] = y[p] - yc[p];
+                omp_unset_lock(locks+p);
+                #pragma omp ordered
+                {
+                    if (p == 0) {
+                        omp_set_lock(locks);
+                        y[0] = y0;
+                        omp_unset_lock(locks);
+                    }
+                    t = slice*p;
+                    yc[p] = y[p];
+                    for (int i=0; i<ncoarse; i++) {
+                        yc[p] = coarse(t, yc[p], hc, f);
+                        t += hc;
+                    }
+                    if (p < num_threads-1 /*not last thread*/) {
+                        omp_set_lock(locks+p+1);
+                        y[p+1] = yc[p] + dy[p];
+                        omp_unset_lock(locks+p+1);
+                    }
+                }
+            }
+        }
+    }
+
+    return y;
+}

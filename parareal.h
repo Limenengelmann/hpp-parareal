@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <omp.h>
 #include "tests.h"
 #include "aux.h"
 
@@ -21,6 +22,12 @@ double rk4_step(double t, double y_t, double h, rhs_func f);
 
 // TODO data structure for fine and coarse solver?
 double* parareal(double start, double end, int ncoarse, int nfine, int num_threads,
+        double y_0,
+        singlestep_func coarse,
+        singlestep_func fine,
+        rhs_func f, int piters);
+
+double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_threads,
         double y_0,
         singlestep_func coarse,
         singlestep_func fine,

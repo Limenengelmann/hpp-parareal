@@ -1,6 +1,6 @@
 CC = gcc
 LD = gcc
-OPT = -O3 -ffast-math -pthread
+OPT = -O3 -ffast-math -pthread -fopenmp
 #PFLAGS = -pg	# separated because it messes with valgrind
 #DBFLAGS = -g -fopt-info-optimized-missed-vec -fopt-info-optimized-missed-loop
 CFLAGS = -Wall -g $(OPT) $(DBFLAGS) $(PFLAGS)

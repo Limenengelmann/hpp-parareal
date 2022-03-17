@@ -60,11 +60,11 @@ int main(int argc, char** argv) {
     double slice = (t_end - t_start)/num_threads;
     double t;
 
-    double hc = slice/ncoarse;
+    //double hc = slice/ncoarse;    // unused
     double hf = slice/nfine;
 
     tic();
-    double* y_res = parareal(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
+    double* y_res = parareal_omp(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
     double time_para = toc();
 
     t = t_start;
