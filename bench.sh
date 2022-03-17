@@ -10,4 +10,6 @@ if [ ! $? -eq 0 ]; then
 fi
 
 ### commands to run
-./main
+# racing condition
+main 8 85 3; 
+gnuplot -c timings.gp outdata/timings.t8.sw85.K3.data;

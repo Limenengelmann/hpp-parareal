@@ -1,11 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <signal.h>
 #include "parareal.h"
 #include "tests.h"
 #include "aux.h"
 
 extern double g_tic;    // global time reference point
+FILE* gtimings;
+extern FILE* gtimings;  // global timings filedescriptor
+
+void graceful_death(int s) {
+    if (gtimings)
+        fclose(gtimings);
+    exit(-1);
+}
 
 int main(int argc, char** argv) {
 #if DBMAIN_TESTS
@@ -34,6 +43,8 @@ int main(int argc, char** argv) {
         // TODO num_threads or num_threads-1?
         printf("Warning: Parareal converges after at most %d p-iterations with %d threads\n", num_threads, num_threads);
     }
+
+    signal(SIGINT, graceful_death);  // exit gracefully on SIGINT
 
     struct timespec w_tic;
     double tic;
@@ -72,6 +83,7 @@ int main(int argc, char** argv) {
     for (int i=0; i<num_threads+1; i++) {
         tmp = fabs(y_res[i] - exp(t));
         l2err += tmp*tmp;
+        printf("Error[%d] : %.2e\n", i, tmp*tmp);
         t += slice;
     }
 
