@@ -211,7 +211,6 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
     double *yc = (double*) malloc((num_threads+1)*sizeof(double)); // coarse solution
     double *dy = (double*) malloc((num_threads+1)*sizeof(double)); // difference of above
 
-
     double slice = (end-start)/num_threads;
     double hc = slice/ncoarse;
     double hf = slice/nfine;
@@ -269,11 +268,11 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
                         yc[p] = coarse(t, yc[p], hc, f);
                         t += hc;
                     }
-                    if (p < num_threads-1 /*not last thread*/) {
-                        omp_set_lock(locks+p+1);
-                        y[p+1] = yc[p] + dy[p];
-                        omp_unset_lock(locks+p+1);
-                    }
+                    //if (p < num_threads) {
+                    omp_set_lock(locks+p+1);
+                    y[p+1] = yc[p] + dy[p];
+                    omp_unset_lock(locks+p+1);
+                    //}
                 }
             }
         }
