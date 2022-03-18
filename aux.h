@@ -16,8 +16,7 @@
 //extern double g_tic;
 #define gtoc() (clock_gettime(CLOCK_REALTIME, &w_tic) == 0) * (((double)w_tic.tv_sec + w_tic.tv_nsec/1e9f) - g_tic)
 
-
-#define addTime2Plot(fp, id, t1, t2) fprintf(fp, "%.9f %d\n%.9f %d\n\n", t1, id, t2, id);
+#define addTime2Plot(fp, id, s, t1, t2) fprintf(fp, "%.9f %d %d\n%.9f %d %d\n", t1, id, s, t2, id, s);
 
 
 // TODO make varargs

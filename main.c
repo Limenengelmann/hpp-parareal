@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
         l2err += tmp*tmp;
         tmp = fabs(y_res_omp[i] - exp(t));
         l2err_omp += tmp*tmp;
-        //printf("Error[%d] : %.2e\n", i, tmp*tmp);
+        printf("Error[%d] : %.2e\n", i, tmp);
         t += slice;
     }
 

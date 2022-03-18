@@ -3,6 +3,7 @@
 extern double g_tic;    // global time reference point
 
 inline double fw_euler_step(double t, double y_t, double h, rhs_func f) {
+    DEBUG(DBRNDSLEEP_FWE, SLEEPTIME((t+0.5)*2));
     return y_t + h*f(t, y_t);
 }
 
@@ -11,6 +12,7 @@ inline double rk4_step(double t, double y_t, double h, rhs_func f) {
     double k2 = f(t+h/2, y_t + h*k1/2);
     double k3 = f(t+h/2, y_t + h*k2/2);
     double k4 = f(t+h, y_t+h*k3);
+    DEBUG(DBRNDSLEEP_RK4, SLEEPTIME((t+0.5)*8));
     return y_t + h/6*(k1 + 2*k2 + 2*k3 + k4);
 }
 
@@ -41,7 +43,8 @@ void* task(void* args) {
         y0 = td->coarse(t, y0, hc, td->f);
         t += hc;
     }
-    DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, tic, gtoc()));
+    DEBUG(DBRNDSLEEP_INI, SLEEPTIME(td->ncoarse));
+    DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, 0, tic, gtoc()));
 
     for (int K=0; K < td->piters; K++) {
         DEBUG(DBTIMINGS, tic = gtoc());
@@ -60,7 +63,8 @@ void* task(void* args) {
             y_fine = td->fine(t, y_fine, hf, td->f);
             t += hf;
         }
-        DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, tic, gtoc()));
+        DEBUG(DBRNDSLEEP_IND, SLEEPTIME(td->ncoarse));
+        DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, 1, tic, gtoc()));
 
         // FIXME race condition for 8 threads 85 steps 3 iterations
         // provoke racing conditions or lapping
@@ -72,6 +76,7 @@ void* task(void* args) {
         //if (td->id == 7) sleep(1);  // -> threads lap thread 7
         
         DEBUG(DBTIMINGS, tic = gtoc());
+        DEBUG(DBRNDSLEEP_DEP, SLEEPTIME(td->ncoarse));
         // serial coarse propagation step + parareal update
         y_next = td->y_next[td->id];    // TODO guarantee y_next is uptodate (sync)
         y0 = y_next;                   // update next starting value
@@ -88,7 +93,7 @@ void* task(void* args) {
         td->progress[td->id]++;
         DPRINTF(DBTHREADS, "#%d(K%d): Iter done. Start iter %d.\n", td->id, K, td->progress[td->id]);
 
-        DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, tic, gtoc()));
+        DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, 2, tic, gtoc()));
     }
     return NULL;
 }
@@ -102,7 +107,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
 
     // init time measurements
     char fname[128];
-    sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data", num_threads, ncoarse, piters);
+    sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.pthread", num_threads, ncoarse, piters);
     FILE* timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
@@ -127,7 +132,10 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
     for (int i=0; i<num_threads; i++)
         progress[i] = 0;
 
-    y_next[0]  = y0;
+    // init y_next
+    for (int i=0; i<num_threads; i++) {
+        y_next[i]  = y0;
+    }
 
     pthread_t threads[num_threads];
     task_data td[num_threads];
@@ -155,7 +163,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         pthread_create(threads+i, NULL, task, (void*) &td[i]);
         t += slice;
     }
-    DEBUG(DBTIMINGS, addTime2Plot(timings, id, tic, gtoc()));
+    DEBUG(DBTIMINGS, addTime2Plot(timings, id, 0, tic, gtoc()));
 
     // parareal iteration
     for (int K=0; K<piters; K++) {
@@ -173,16 +181,22 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             y_fine = fine(t, y_fine, hf, f);
             t += hf;
         }
-        DEBUG(DBTIMINGS, addTime2Plot(timings, id, tic, gtoc()));
+        DEBUG(DBRNDSLEEP_IND, SLEEPTIME(ncoarse));
+        DEBUG(DBTIMINGS, addTime2Plot(timings, id, 1, tic, gtoc()));
         // wait for last thread to at least finish the previous iteration
         // to keep threads "together" and prevent them from lapping each other
         // TODO test via variable runtime lengths dep on id?
         // TODO quicker to just let the threads run
+        //
+        // TODO find out which disturbance has the largest effect
+        /*
         DPRINTF(DBTHREADS, "#%d(K%d): Waiting for #%d to reach iter %d\n", id, K, num_threads-1, K);
-        while (progress[num_threads-1] < K);
+        while (progress[num_threads-1] < K-1);
         DPRINTF(DBTHREADS, "#%d(K%d): Finished waiting, continuing.\n", id, K);
+        */
 
         DEBUG(DBTIMINGS, tic = gtoc());
+        DEBUG(DBRNDSLEEP_DEP, SLEEPTIME(ncoarse));
         t = start;
         y_new_coarse = y0;     // = y_next[0]
         for (int i=0; i<ncoarse; i++) {
@@ -195,7 +209,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         progress[0]++;
         DPRINTF(DBTHREADS, "#%d(K%d): Iter done. Start iter %d.\n", id, K, progress[id]);
 
-        DEBUG(DBTIMINGS, addTime2Plot(timings, id, tic, gtoc()));
+        DEBUG(DBTIMINGS, addTime2Plot(timings, id, 2, tic, gtoc()));
     }
 
     for (int i=1; i<num_threads; i++) {
@@ -209,6 +223,16 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
 double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_threads,
         double y0, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
 
+    char fname[128];
+    sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.omp", num_threads, ncoarse, piters);
+    FILE* timings = fopen(fname, "w");
+    if (! timings) {
+        perror("Couldn't open timings.data");
+        return NULL;
+    }
+    struct timespec w_tic;
+    double tic = gtoc();
+
     double *y  = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
     double *yc = (double*) malloc((num_threads+1)*sizeof(double)); // coarse solution
     double *dy = (double*) malloc((num_threads+1)*sizeof(double)); // difference of above
@@ -217,17 +241,22 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
     double hc = slice/ncoarse;
     double hf = slice/nfine;
 
-    y[0] = y0;
+    for (int i=0; i<num_threads+1; i++) {
+        y[i] = y0;
+        yc[i] = y0;
+        dy[i] = 0;
+    }
 
     omp_lock_t locks[num_threads+1];    // +1 removes edge case 
                                         // for last thread locking before updating
     for (int i=0; i<num_threads+1; i++) {
         omp_init_lock(locks+i);
     }
+    // TODO wrong results for T8 or T16 and K 10 with random sleep
 
     omp_set_num_threads(num_threads);
     int P = num_threads;
-    #pragma omp parallel 
+    #pragma omp parallel firstprivate(tic, w_tic)
     {
         #pragma omp for nowait schedule(static)
         for (int p=0; p<P; p++) {
@@ -245,11 +274,15 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
                 yc[p] = coarse(t, yc[p], hc, f);
                 t+=hc;
             }
+            DEBUG(DBRNDSLEEP_INI, SLEEPTIME(ncoarse));
+            DEBUG(DBTIMINGS, addTime2Plot(timings, p, 0, tic, gtoc()));
         }
 
         for (int k=0; k<piters; k++) {
-            #pragma omp for ordered nowait schedule(static)
+            //#pragma omp for ordered schedule(static)      // gives correct result
+            #pragma omp for ordered nowait schedule(static) // sometimes wrong result
             for (int p=0; p<P; p++) {
+                DEBUG(DBTIMINGS, tic = gtoc());
                 DPRINTF(DBTHREADS, "#%d: Starting iter %d.\n", p, k);
                 double t = slice*p;
                 omp_set_lock(locks+p);
@@ -260,8 +293,12 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
                 dy[p] = y[p] - yc[p];
                 omp_unset_lock(locks+p);
                 DPRINTF(DBTHREADS, "#%d(K%d): Fine steps done.\n", p, k);
+                DEBUG(DBRNDSLEEP_IND, SLEEPTIME(ncoarse));
+                DEBUG(DBTIMINGS, addTime2Plot(timings, p, 1, tic, gtoc()));
                 #pragma omp ordered
                 {
+                    DEBUG(DBTIMINGS, tic = gtoc());
+                    DEBUG(DBRNDSLEEP_DEP, SLEEPTIME(ncoarse));
                     if (p == 0) {
                         omp_set_lock(locks);
                         y[0] = y0;
@@ -277,10 +314,12 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
                     omp_set_lock(locks+p+1);
                     y[p+1] = yc[p] + dy[p];
                     omp_unset_lock(locks+p+1);
+                    DEBUG(DBTIMINGS, addTime2Plot(timings, p, 2, tic, gtoc()));
                 }
             }
         }
     }
+    fclose(timings);
 
     return y;
 }

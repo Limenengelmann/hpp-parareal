@@ -9,14 +9,24 @@
 #include "parareal.h"
 #include "aux.h"
 
+#define F_WORK 300      // time to evaluate f in micros
+
 // can be switched by Makefile
 #define DEBUGGING       1
 
+// debug sections
 #define DBTESTS         0
 #define DBMAIN_TESTS    0
 #define DBPARAPLOT      0
 #define DBTIMINGS       1
 #define DBTHREADS       0
+#define DBRNDSLEEP_INI  1
+#define DBRNDSLEEP_IND  1
+#define DBRNDSLEEP_DEP  1
+#define DBRNDSLEEP_RK4  0
+#define DBRNDSLEEP_FWE  0
+
+#define SLEEPTIME(n) usleep(rand()%lround((n)*F_WORK/2))
 
 // debug printing
 #if DEBUGGING

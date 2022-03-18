@@ -2,9 +2,11 @@ reset
 
 print "script             : ", ARG0
 print "Ploting file       : ", ARG1
+print "plot OMP too       : ", ARG2
 print "number of arguments: ", ARGC
 
 work=ARG1
+workomp=ARG1."omp"
 
 #set yrange [-0.5:8.5]
 set autoscale xfixmin   # axis range automatically scaled to 
@@ -31,12 +33,18 @@ set format x "%2.1f"
 set xtics  0,0.5,32
 set ytics  0,1,32
 
+
 #TODO plot pure lines instead of lines with point ends
 do for [i=1:100000] {
+    set multiplot layout 1,2
     plot work with linespoints linestyle 1
     replot
+    if (ARGC == 3) {
+        plot workomp with linespoints linestyle 1
+    }
     pause mouse keypress
     if (MOUSE_CHAR eq 'q') {
         break
     }
+    unset multiplot
 }

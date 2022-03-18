@@ -7,7 +7,7 @@ double f_cos(double t, double x_t) {
 }
 
 double f_id(double t, double x_t) {
-    usleep(300);
+    usleep(F_WORK);
     return x_t;
 }
 
