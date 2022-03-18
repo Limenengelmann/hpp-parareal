@@ -41,10 +41,10 @@ void* task(void* args) {
         y0 = td->coarse(t, y0, hc, td->f);
         t += hc;
     }
-    addTime2Plot(td->timings, td->id, tic, gtoc());
+    DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, tic, gtoc()));
 
     for (int K=0; K < td->piters; K++) {
-        tic = gtoc();
+        DEBUG(DBTIMINGS, tic = gtoc());
         // parallel coarse step
         y_coarse = y0;
         t = td->t0;
@@ -60,7 +60,7 @@ void* task(void* args) {
             y_fine = td->fine(t, y_fine, hf, td->f);
             t += hf;
         }
-        addTime2Plot(td->timings, td->id, tic, gtoc());
+        DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, tic, gtoc()));
 
         // FIXME race condition for 8 threads 85 steps 3 iterations
         // provoke racing conditions or lapping
@@ -71,7 +71,7 @@ void* task(void* args) {
         DPRINTF(DBTHREADS, "#%d(K%d): Finished waiting, continuing.\n", td->id, K);
         //if (td->id == 7) sleep(1);  // -> threads lap thread 7
         
-        tic = gtoc();
+        DEBUG(DBTIMINGS, tic = gtoc());
         // serial coarse propagation step + parareal update
         y_next = td->y_next[td->id];    // TODO guarantee y_next is uptodate (sync)
         y0 = y_next;                   // update next starting value
@@ -88,7 +88,7 @@ void* task(void* args) {
         td->progress[td->id]++;
         DPRINTF(DBTHREADS, "#%d(K%d): Iter done. Start iter %d.\n", td->id, K, td->progress[td->id]);
 
-        addTime2Plot(td->timings, td->id, tic, gtoc());
+        DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, tic, gtoc()));
     }
     return NULL;
 }
@@ -112,7 +112,8 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
 
     int id = 0;  // main thread #0
     struct timespec w_tic;
-    double tic = gtoc();
+    double tic; 
+    DEBUG(DBTIMINGS, tic = gtoc());
 
     double slice = (end-start)/num_threads;
     double hc = slice/ncoarse;
@@ -154,11 +155,11 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         pthread_create(threads+i, NULL, task, (void*) &td[i]);
         t += slice;
     }
-    addTime2Plot(timings, id, tic, gtoc());
+    DEBUG(DBTIMINGS, addTime2Plot(timings, id, tic, gtoc()));
 
     // parareal iteration
     for (int K=0; K<piters; K++) {
-        tic = gtoc();
+        DEBUG(DBTIMINGS, tic = gtoc());
         t = start;
         y_coarse = y0;
         for(int i=0; i < ncoarse; i++) {
@@ -172,15 +173,16 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
             y_fine = fine(t, y_fine, hf, f);
             t += hf;
         }
-        addTime2Plot(timings, id, tic, gtoc());
+        DEBUG(DBTIMINGS, addTime2Plot(timings, id, tic, gtoc()));
         // wait for last thread to at least finish the previous iteration
         // to keep threads "together" and prevent them from lapping each other
         // TODO test via variable runtime lengths dep on id?
+        // TODO quicker to just let the threads run
         DPRINTF(DBTHREADS, "#%d(K%d): Waiting for #%d to reach iter %d\n", id, K, num_threads-1, K);
         while (progress[num_threads-1] < K);
         DPRINTF(DBTHREADS, "#%d(K%d): Finished waiting, continuing.\n", id, K);
 
-        tic = gtoc();
+        DEBUG(DBTIMINGS, tic = gtoc());
         t = start;
         y_new_coarse = y0;     // = y_next[0]
         for (int i=0; i<ncoarse; i++) {
@@ -193,7 +195,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         progress[0]++;
         DPRINTF(DBTHREADS, "#%d(K%d): Iter done. Start iter %d.\n", id, K, progress[id]);
 
-        addTime2Plot(timings, id, tic, gtoc());
+        DEBUG(DBTIMINGS, addTime2Plot(timings, id, tic, gtoc()));
     }
 
     for (int i=1; i<num_threads; i++) {
@@ -217,8 +219,9 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
 
     y[0] = y0;
 
-    omp_lock_t locks[num_threads];
-    for (int i=0; i<num_threads; i++) {
+    omp_lock_t locks[num_threads+1];    // +1 removes edge case 
+                                        // for last thread locking before updating
+    for (int i=0; i<num_threads+1; i++) {
         omp_init_lock(locks+i);
     }
 
@@ -247,6 +250,7 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
         for (int k=0; k<piters; k++) {
             #pragma omp for ordered nowait schedule(static)
             for (int p=0; p<P; p++) {
+                DPRINTF(DBTHREADS, "#%d: Starting iter %d.\n", p, k);
                 double t = slice*p;
                 omp_set_lock(locks+p);
                 for (int i=0; i<nfine; i++) {
@@ -255,6 +259,7 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
                 }
                 dy[p] = y[p] - yc[p];
                 omp_unset_lock(locks+p);
+                DPRINTF(DBTHREADS, "#%d(K%d): Fine steps done.\n", p, k);
                 #pragma omp ordered
                 {
                     if (p == 0) {
@@ -268,11 +273,10 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
                         yc[p] = coarse(t, yc[p], hc, f);
                         t += hc;
                     }
-                    //if (p < num_threads) {
+                    DPRINTF(DBTHREADS, "#%d(K%d): Updating y.\n", p, k);
                     omp_set_lock(locks+p+1);
                     y[p+1] = yc[p] + dy[p];
                     omp_unset_lock(locks+p+1);
-                    //}
                 }
             }
         }

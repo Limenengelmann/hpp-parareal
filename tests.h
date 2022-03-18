@@ -14,7 +14,8 @@
 
 #define DBTESTS         0
 #define DBMAIN_TESTS    0
-#define DBPARAPLOT      1
+#define DBPARAPLOT      0
+#define DBTIMINGS       1
 #define DBTHREADS       0
 
 // debug printing
@@ -33,7 +34,7 @@
 #else
 #define DPRINTF(...)
 #define DEBUG(...)
-#endif
+#endif  // #if DEBUGGING
 
 int run_tests();
 double f_cos(double t, double x_t);

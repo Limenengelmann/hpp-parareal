@@ -6,7 +6,7 @@ print "number of arguments: ", ARGC
 
 work=ARG1
 
-set yrange [-0.5:8.5]
+#set yrange [-0.5:8.5]
 set autoscale xfixmin   # axis range automatically scaled to 
                         # include the range
 set autoscale xfixmax   # of data to be plotted

@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
         piters = atoi(argv[3]);
     if (piters > num_threads) {
         // TODO num_threads or num_threads-1?
-        printf("Warning: Parareal converges after at most %d p-iterations with %d threads\n", num_threads, num_threads);
+        //printf("Warning: Parareal converges after at most %d p-iterations with %d threads\n", num_threads, num_threads);
     }
 
     signal(SIGINT, graceful_death);  // exit gracefully on SIGINT
@@ -64,8 +64,13 @@ int main(int argc, char** argv) {
     double hf = slice/nfine;
 
     tic();
-    double* y_res = parareal_omp(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
+    double* y_res = parareal(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
     double time_para = toc();
+
+    tic();
+    double* y_res_omp = parareal_omp(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
+    double time_para_omp = toc();
+
 
     t = t_start;
     double y_t = y_0;
@@ -74,30 +79,44 @@ int main(int argc, char** argv) {
         y_t = rk4_step(t, y_t, hf, f_id);
         t += hf;
     }
-    printf("Rk4 error: %.2e (res: %f, sol: %f\n", fabs(y_t-exp(t)), y_t, exp(t));
     double time_serial = toc();
 
     double l2err = 0;
+    double l2err_omp = 0;
     double tmp = -1;
     t = t_start;
     for (int i=0; i<num_threads+1; i++) {
         tmp = fabs(y_res[i] - exp(t));
         l2err += tmp*tmp;
-        printf("Error[%d] : %.2e\n", i, tmp*tmp);
+        tmp = fabs(y_res_omp[i] - exp(t));
+        l2err_omp += tmp*tmp;
+        //printf("Error[%d] : %.2e\n", i, tmp*tmp);
         t += slice;
     }
 
     double speedup = time_serial/time_para;
-    printf("Parareal l2error: %.2e, last step: %.2e (res: %f, sol: %f)\n", l2err, tmp, y_res[num_threads], exp(t-slice));
-    printf("Threads: %d, total fine integrator steps: %d, coarse steps (per slice): %d\n", num_threads, pwork, ncoarse);
-    printf("Times: parar %.2fs, rk4 %.2fs\n", time_para, time_serial);
-    printf("Speedup: %.2f, Efficiency: %.2f\n", speedup, 
-            speedup/num_threads);
+    double speedup_omp = time_serial/time_para_omp;
+    printf("Threads: %d, K: %d, total fine steps: %d, coarse steps (per slice): %d\n",
+            num_threads, piters, pwork, ncoarse);
+    printf("Errors: Rk4      last step: %.2e (res: %f, sol: %f\n", 
+            fabs(y_t-exp(t_end)), y_t, exp(t_end));
+    printf("        Pthreads last step: %.2e (res: %f, sol: %f), l2error: %.2e\n",
+            fabs(y_res[num_threads] - exp(t_end)), y_res[num_threads], exp(t_end), l2err);
+    printf("        OMP      last step: %.2e (res: %f, sol: %f), l2error: %.2e\n",
+            fabs(y_res_omp[num_threads] - exp(t_end)), y_res_omp[num_threads], exp(t_end), l2err_omp);
+    printf("Times: serial rk4 %.2fs\n", time_serial);
+    printf("       pthread    %.2fs, speedup: %.2f, efficiency: %.2f\n", 
+            time_para, speedup, speedup/num_threads);
+    printf("       omp        %.2fs, speedup: %.2f, efficiency: %.2f\n", 
+            time_para_omp, speedup_omp, speedup_omp/num_threads);
 
+#if DBPARAPLOT
     write2file(t_start, slice, num_threads+1, y_res);
     gnuplot();
+#endif
 
     free(y_res);
+    free(y_res_omp);
 
     return 0;
 }
