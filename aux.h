@@ -22,7 +22,7 @@
 #define DBTESTS         0
 #define DBMAIN_TESTS    0
 #define DBPARAPLOT      0
-#define DBTIMINGS       1
+#define DBTIMINGS       0
 #define DBTHREADS       0
 
 // randomize workload in different code sections

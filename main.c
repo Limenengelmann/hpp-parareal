@@ -16,7 +16,6 @@ void graceful_death(int s) {
     exit(-1);
 }
 
-
 int main(int argc, char** argv) {
 #if DBMAIN_TESTS
     if (run_tests()) {
@@ -112,23 +111,11 @@ int main(int argc, char** argv) {
     double speedup = time_serial/time_para;
     double speedup_pt = time_serial/time_para_pt;
     double speedup_omp = time_serial/time_para_omp;
-    printf("Threads: %d, K: %d, total fine steps: %d, coarse steps (per slice): %d\n",
-            num_threads, piters, pwork, ncoarse);
-    printf("Errors: Rk4      last step: %.2e (res: %f, sol: %f\n", 
-            fabs(y_t-sol_id(t_end)), y_t, sol_id(t_end));
-    printf("        Parareal last step: %.2e (res: %f, sol: %f), l2error: %.2e\n",
-            fabs(y_res[num_threads] - sol_id(t_end)), y_res[num_threads], sol_id(t_end), l2err);
-    printf("        Pthreads last step: %.2e (res: %f, sol: %f), l2error: %.2e\n",
-            fabs(y_res_pt[num_threads] - sol_id(t_end)), y_res_pt[num_threads], sol_id(t_end), l2err_pt);
-    printf("        OMP      last step: %.2e (res: %f, sol: %f), l2error: %.2e\n",
-            fabs(y_res_omp[num_threads] - sol_id(t_end)), y_res_omp[num_threads], sol_id(t_end), l2err_omp);
-    printf("Times: serial rk4 %.2fs\n", time_serial);
-    printf("       parareal   %.2fs, speedup: %.2f, efficiency: %.2f\n", 
-            time_para, speedup, speedup/num_threads);
-    printf("       pthread    %.2fs, speedup: %.2f, efficiency: %.2f\n", 
-            time_para_pt, speedup_pt, speedup_pt/num_threads);
-    printf("       omp        %.2fs, speedup: %.2f, efficiency: %.2f\n", 
-            time_para_omp, speedup_omp, speedup_omp/num_threads);
+    printf("%d, %d, %d, ", num_threads, ncoarse, piters);
+    printf("%.2e, %.2e, %.2e, ", l2err, l2err_pt, l2err_omp);
+    printf("%.2f, %.2f, %.2f, ",   time_para, speedup, speedup/num_threads);
+    printf("%.2f, %.2f, %.2f, ",   time_para_pt, speedup_pt, speedup_pt/num_threads);
+    printf("%.2f, %.2f, %.2f\n", time_para_omp, speedup_omp, speedup_omp/num_threads);
 
 #if DBPARAPLOT
     write2file(t_start, slice, num_threads+1, y_res);
