@@ -28,8 +28,8 @@ fi
 # racing condition
 for t in 1 2 4 8 16; do
     for sw in 1 2 4 8 16 32 64 128 256; do
-        for k in seq 4; do
-            for reruns in seq 5; do
+        for k in $(seq 4); do
+            for reruns in $(seq 5); do
                 main $t $sw $k | tee -a outdata/bench.out
             done
         done
