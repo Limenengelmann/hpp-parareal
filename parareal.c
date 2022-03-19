@@ -4,8 +4,10 @@ extern double g_tic;    // global time reference point
 extern FILE* gtimings;  // close open file on interrupt
 
 static void* pipel_task(void* args) {
+#if DBTIMINGS
     struct timespec w_tic;
     double tic = gtoc();
+#endif
     pipel_task_data* td = (pipel_task_data*) args;
 
     double y_coarse, y_fine, y_next;
@@ -42,18 +44,15 @@ static void* pipel_task(void* args) {
         DEBUG(DBRNDSLEEP_IND, SLEEPTIME(td->ncoarse));
         DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, 1, tic, gtoc()));
 
-        // provoke racing conditions or lapping
-
         // wait for previous thread to finish iteration and update y_next
         DPRINTF(DBTHREADS, "#%d(K%d): Waiting for #%d to reach iter %d\n", td->id, K, td->id-1, K+1);
         while (td->progress[td->id-1] < K+1);
         DPRINTF(DBTHREADS, "#%d(K%d): Finished waiting, continuing.\n", td->id, K);
-        //if (td->id == 7) sleep(1);  // -> threads lap thread 7
         
         DEBUG(DBTIMINGS, tic = gtoc());
         DEBUG(DBRNDSLEEP_DEP, SLEEPTIME(5*td->ncoarse));
         // serial coarse propagation step + parareal update
-        y_next = td->y_next[td->id];    // TODO guarantee y_next is uptodate (sync)
+        y_next = td->y_next[td->id];
         y0 = y_next;                   // update next starting value
         t = td->t0;
         for (int i=0; i<td->ncoarse; i++) {
@@ -62,7 +61,6 @@ static void* pipel_task(void* args) {
         }
 
         // parareal update
-        // TODO just accumulate result directly in y_next?
         y_next = y_next + y_fine - y_coarse;
         td->y_next[td->id+1] = y_next;
         td->progress[td->id]++;
@@ -73,33 +71,30 @@ static void* pipel_task(void* args) {
     return NULL;
 }
 
-// TODO plot idea: speedup vs relative serial work/total work
-// TODO proper malloc/free symmetry by passing buffers as arguments
-// TODO add numthreads as arg
-double* parareal_pthread(double start, double end, int ncoarse, int nfine, int num_threads,
-        double y0, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
+void parareal_pthread(double start, double end, int ncoarse, int nfine, int num_threads,
+        double y0, double* y_next, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
 
+#if DBTIMINGS
     // init time measurements
     char fname[128];
     sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.pthread", num_threads, ncoarse, piters);
     FILE* timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
-        return NULL;
+        exit(-1);
     }
     gtimings = timings;
 
-    int id = 0;  // main thread #0
     struct timespec w_tic;
     double tic; 
     DEBUG(DBTIMINGS, tic = gtoc());
+#endif
 
+    int id = 0;  // main thread #0
     double slice = (end-start)/num_threads;
     double hc = slice/ncoarse;
     double hf = slice/nfine;
     double y_coarse, y_fine, y_new_coarse;
-    // +1 to account for y0
-    double *y_next  = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
 
     // cheap "semaphores"
     volatile char progress[num_threads];     // signals which iteration a thread is at
@@ -114,11 +109,8 @@ double* parareal_pthread(double start, double end, int ncoarse, int nfine, int n
     pthread_t threads[num_threads];
     pipel_task_data td[num_threads];
 
-    // TODO measure total waiting time (downtime) by increasing a counter
-    // TODO how to give different colors for different timings
     double t = start+slice;
     for(int i = 1; i < num_threads; i++) {
-        // TODO pass y_fine pointer, then write result directly ?
         // how to slim this down ? only t and y change per iteration
         td[i].t0 = t;
         td[i].y0 = y0;      // obsolete, same as y_next[0]
@@ -157,12 +149,8 @@ double* parareal_pthread(double start, double end, int ncoarse, int nfine, int n
         }
         DEBUG(DBRNDSLEEP_IND, SLEEPTIME(ncoarse));
         DEBUG(DBTIMINGS, addTime2Plot(timings, id, 1, tic, gtoc()));
-        // wait for last thread to at least finish the previous iteration
-        // to keep threads "together" and prevent them from lapping each other
-        // TODO test via variable runtime lengths dep on id?
-        // TODO quicker to just let the threads run
-        //
         // TODO find out which disturbance has the largest effect
+        // Answer: DEPENDENT part (in hindsight obviously)
         /*
         DPRINTF(DBTHREADS, "#%d(K%d): Waiting for #%d to reach iter %d\n", id, K, num_threads-1, K);
         while (progress[num_threads-1] < K-1);
@@ -178,7 +166,6 @@ double* parareal_pthread(double start, double end, int ncoarse, int nfine, int n
             t += hc;
         }
         // parareal update
-        // TODO just accumulate result directly in y_next?
         y_next[1] = y_new_coarse + y_fine - y_coarse;
         progress[0]++;
         DPRINTF(DBTHREADS, "#%d(K%d): Iter done. Start iter %d.\n", id, K, progress[id]);
@@ -191,23 +178,23 @@ double* parareal_pthread(double start, double end, int ncoarse, int nfine, int n
     }
 
     fclose(timings);
-    return y_next;
 }
 
-double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_threads,
-        double y0, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
+void parareal_omp(double start, double end, int ncoarse, int nfine, int num_threads,
+        double y0, double *y, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
 
+#if DBTIMINGS
     char fname[128];
     sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.omp", num_threads, ncoarse, piters);
     FILE* timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
-        return NULL;
+        exit(-1);
     }
     struct timespec w_tic;
     double tic = gtoc();
+#endif
 
-    double *y  = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
     double *yc = (double*) malloc((num_threads+1)*sizeof(double)); // coarse solution
     double *dy = (double*) malloc((num_threads+1)*sizeof(double)); // difference of above
 
@@ -296,12 +283,17 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
             }
         }
     }
-    fclose(timings);
 
-    return y;
+    fclose(timings);
+    free(yc);
+    free(dy);
 }
 
 static void* task(void* args) {
+#if DBTIMINGS
+    struct timespec w_tic;
+    double tic = gtoc();
+#endif
     task_data* td = (task_data*) args;
     double y_t = td->y_t;
     for (int j=0; j<td->nfine; j++) {
@@ -309,20 +301,36 @@ static void* task(void* args) {
         td->t += td->hf;
     }
     td->y_t = y_t;
+    DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, 1, tic, gtoc()));
     return NULL;
 }
 
-double* parareal(double start, double end, int ncoarse, int nfine, 
-        int num_threads, double y_0, 
+void parareal(double start, double end, int ncoarse, int nfine, 
+        int num_threads, double y_0, double* y_t_new,
         singlestep_func coarse, singlestep_func fine, 
         rhs_func f, int piters) {
+
+#if DBTIMINGS
+    char fname[128];
+    sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.pthread", num_threads, ncoarse, piters);
+    FILE* timings = fopen(fname, "w");
+    if (! timings) {
+        perror("Couldn't open timings.data");
+        exit(-1);
+    }
+    gtimings = timings;
+
+    struct timespec w_tic;
+    double tic; 
+    DEBUG(DBTIMINGS, tic = gtoc());
+#endif
+    int id = 0;
 
     double slice = (end-start)/num_threads;
     double hc = slice/ncoarse;
     double hf = slice/nfine;
     // +1 to account for y_0
     double *y_t_old  = (double*) malloc((num_threads+1)*sizeof(double));
-    double *y_t_new  = (double*) malloc((num_threads+1)*sizeof(double));
     double *y_t_fine = (double*) malloc((num_threads+1)*sizeof(double));
 
     y_t_old[0]  = y_0;
@@ -339,10 +347,11 @@ double* parareal(double start, double end, int ncoarse, int nfine,
         }
         y_t_old[i+1] = y_old;
     }
-    //gnuplot();
+    DEBUG(DBTIMINGS, addTime2Plot(timings, id, 0, tic, gtoc()));
 
     // parareal iteration
     for (int K=0; K<piters; K++) {
+        DEBUG(DBTIMINGS, tic = gtoc());
         // parallel fine steps
         t = start;
 
@@ -357,22 +366,20 @@ double* parareal(double start, double end, int ncoarse, int nfine,
             td[i].f = f;
             td[i].fine = fine;
             td[i].id = i;
+            td[i].timings = timings;
             pthread_create(threads+i, NULL, task, (void*) &td[i]);
             t += slice;
         }
+        DEBUG(DBTIMINGS, addTime2Plot(timings, id, 0, tic, gtoc()));
 
         for (int i=0; i<num_threads; i++) {
             pthread_join(threads[i], NULL);
             y_t_fine[i+1] = td[i].y_t;
         }
 
-        //write2file(start, slice, num_threads+1, y_t_fine);
-        //char b;
-        //scanf("%c", &b);
-
+        DEBUG(DBTIMINGS, tic = gtoc());
 
         // corrections and sequential coarse steps
-        // TODO currently limited to 1 step for coarse update
         t = start;
         for (int i=0; i<num_threads; i++) {
             y_new = y_t_new[i];
@@ -386,9 +393,8 @@ double* parareal(double start, double end, int ncoarse, int nfine,
         }
         // new -> old
         memcpy(y_t_old+1, y_t_new+1, num_threads*sizeof(double));
+        DEBUG(DBTIMINGS, addTime2Plot(timings, id, 2, tic, gtoc()));
     }
     free(y_t_old );
     free(y_t_fine);
-
-    return y_t_new;
 }

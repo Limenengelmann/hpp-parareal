@@ -16,6 +16,7 @@ void graceful_death(int s) {
     exit(-1);
 }
 
+
 int main(int argc, char** argv) {
 #if DBMAIN_TESTS
     if (run_tests()) {
@@ -41,7 +42,6 @@ int main(int argc, char** argv) {
     if (argc >= 4)
         piters = atoi(argv[3]);
     if (piters > num_threads) {
-        // TODO num_threads or num_threads-1?
         //printf("Warning: Parareal converges after at most %d p-iterations with %d threads\n", num_threads, num_threads);
     }
 
@@ -63,16 +63,23 @@ int main(int argc, char** argv) {
     double t;                       // time variable
     double hf       = slice/nfine;  // fine-integrator stepsize                  
 
+    double *y_res     = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
+    double *y_res_pt  = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
+    double *y_res_omp = (double*) malloc((num_threads+1)*sizeof(double)); // current solution
 
     /*
      * Benchmark start
      */
     tic();
-    double* y_res = parareal(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
+    parareal(t_start, t_end, ncoarse, nfine, num_threads, y_0, y_res, fw_euler_step, rk4_step, f_id, piters);
     double time_para = toc();
 
     tic();
-    double* y_res_omp = parareal_omp(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
+    parareal_pthread(t_start, t_end, ncoarse, nfine, num_threads, y_0, y_res_pt, fw_euler_step, rk4_step, f_id, piters);
+    double time_para_pt = toc();
+
+    tic();
+    parareal_omp(t_start, t_end, ncoarse, nfine, num_threads, y_0, y_res_omp, fw_euler_step, rk4_step, f_id, piters);
     double time_para_omp = toc();
 
     // serial solve with fine integrator
@@ -87,31 +94,39 @@ int main(int argc, char** argv) {
 
     // calculate l2 errors
     double l2err = 0;
+    double l2err_pt = 0;
     double l2err_omp = 0;
     double tmp = -1;
     t = t_start;
     for (int i=0; i<num_threads+1; i++) {
-        tmp = fabs(y_res[i] - exp(t));
+        tmp = fabs(y_res[i] - sol_id(t));
         l2err += tmp*tmp;
-        tmp = fabs(y_res_omp[i] - exp(t));
+        tmp = fabs(y_res_pt[i] - sol_id(t));
+        l2err_pt += tmp*tmp;
+        tmp = fabs(y_res_omp[i] - sol_id(t));
         l2err_omp += tmp*tmp;
         DPRINTF(1, "Error[%d] : %.2e\n", i, tmp);
         t += slice;
     }
 
     double speedup = time_serial/time_para;
+    double speedup_pt = time_serial/time_para_pt;
     double speedup_omp = time_serial/time_para_omp;
     printf("Threads: %d, K: %d, total fine steps: %d, coarse steps (per slice): %d\n",
             num_threads, piters, pwork, ncoarse);
     printf("Errors: Rk4      last step: %.2e (res: %f, sol: %f\n", 
-            fabs(y_t-exp(t_end)), y_t, exp(t_end));
+            fabs(y_t-sol_id(t_end)), y_t, sol_id(t_end));
+    printf("        Parareal last step: %.2e (res: %f, sol: %f), l2error: %.2e\n",
+            fabs(y_res[num_threads] - sol_id(t_end)), y_res[num_threads], sol_id(t_end), l2err);
     printf("        Pthreads last step: %.2e (res: %f, sol: %f), l2error: %.2e\n",
-            fabs(y_res[num_threads] - exp(t_end)), y_res[num_threads], exp(t_end), l2err);
+            fabs(y_res_pt[num_threads] - sol_id(t_end)), y_res_pt[num_threads], sol_id(t_end), l2err_pt);
     printf("        OMP      last step: %.2e (res: %f, sol: %f), l2error: %.2e\n",
-            fabs(y_res_omp[num_threads] - exp(t_end)), y_res_omp[num_threads], exp(t_end), l2err_omp);
+            fabs(y_res_omp[num_threads] - sol_id(t_end)), y_res_omp[num_threads], sol_id(t_end), l2err_omp);
     printf("Times: serial rk4 %.2fs\n", time_serial);
-    printf("       pthread    %.2fs, speedup: %.2f, efficiency: %.2f\n", 
+    printf("       parareal   %.2fs, speedup: %.2f, efficiency: %.2f\n", 
             time_para, speedup, speedup/num_threads);
+    printf("       pthread    %.2fs, speedup: %.2f, efficiency: %.2f\n", 
+            time_para_pt, speedup_pt, speedup_pt/num_threads);
     printf("       omp        %.2fs, speedup: %.2f, efficiency: %.2f\n", 
             time_para_omp, speedup_omp, speedup_omp/num_threads);
 
@@ -121,6 +136,7 @@ int main(int argc, char** argv) {
 #endif
 
     free(y_res);
+    free(y_res_pt);
     free(y_res_omp);
 
     return 0;

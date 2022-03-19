@@ -20,7 +20,11 @@ double f_cos(double t, double x_t) {
 
 double f_id(double t, double x_t) {
     usleep(F_WORK);
-    return x_t;
+    return -x_t;
+}
+
+double sol_id(double t) {
+    return exp(-t);
 }
 
 static int test_singlestep_integrator(singlestep_func s, double tol) {
@@ -36,7 +40,7 @@ static int test_singlestep_integrator(singlestep_func s, double tol) {
         t += h;
     }
 
-    double err = fabs(x_t - exp(t));
+    double err = fabs(x_t - sol_id(t));
     DPRINTF(DBTESTS, "Error: %.2e\n", err);
     return err <= tol;
 }

@@ -12,6 +12,7 @@ typedef double (*singlestep_func) (double t, double y_t, double h, rhs_func f);
 
 double f_cos(double t, double x_t);
 double f_id(double t, double x_t);
+double sol_id(double t);
 double fw_euler_step(double t, double y_t, double h, rhs_func f);
 double rk4_step(double t, double y_t, double h, rhs_func f);
 

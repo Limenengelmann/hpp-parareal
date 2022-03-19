@@ -16,20 +16,21 @@
 /*
  * DEBUG Macros
  */
-#define DEBUGGING       1
+#define DEBUGGING       0
 
 // debug sections
 #define DBTESTS         0
 #define DBMAIN_TESTS    0
 #define DBPARAPLOT      0
 #define DBTIMINGS       1
-#define DBTHREADS       1
+#define DBTHREADS       0
+
+// randomize workload in different code sections
 #define DBRNDSLEEP_INI  0
 #define DBRNDSLEEP_IND  0
-#define DBRNDSLEEP_DEP  1
+#define DBRNDSLEEP_DEP  0
 #define DBRNDSLEEP_RK4  0
 #define DBRNDSLEEP_FWE  0
-
 #define SLEEPTIME(n) usleep(rand()%lround((n)*F_WORK/2))
 
 // debug printing
@@ -66,7 +67,7 @@
 /*
  * Visualisation Helper
  */
-void write2file(double start, double h, int nsteps, double *y);
+void write2file(double start, double h, int nsteps, double *y, int id);
 
 void gnuplot();
 

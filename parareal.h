@@ -17,6 +17,7 @@ typedef struct task_data {
     int nfine, id;
     rhs_func f;
     singlestep_func fine;
+    FILE* timings;
 } task_data;
 
 typedef struct pipel_task_data {
@@ -34,20 +35,20 @@ double fw_euler_step(double t, double y_t, double h, rhs_func f);
 
 double rk4_step(double t, double y_t, double h, rhs_func f);
 
-double* parareal_pthread(double start, double end, int ncoarse, int nfine, int num_threads,
-        double y_0,
+void parareal_pthread(double start, double end, int ncoarse, int nfine, int num_threads,
+        double y_0, double *y,
         singlestep_func coarse,
         singlestep_func fine,
         rhs_func f, int piters);
 
-double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_threads,
-        double y_0,
+void parareal_omp(double start, double end, int ncoarse, int nfine, int num_threads,
+        double y_0, double *y,
         singlestep_func coarse,
         singlestep_func fine,
         rhs_func f, int piters);
 
-double* parareal(double start, double end, int ncoarse, int nfine, int num_threads,
-        double y_0,
+void parareal(double start, double end, int ncoarse, int nfine, int num_threads,
+        double y_0, double *y,
         singlestep_func coarse,
         singlestep_func fine,
         rhs_func f, int piters);
