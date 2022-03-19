@@ -28,9 +28,10 @@ t=16
 sw=1024
 K=12
 fname=timings.t$t.sw$sw.K$K.data
-if [ ! -e a.outdata/out.$fname ]; then
+if [ ! -e outdata/out.$fname ]; then
     main $t $sw $K | tee outdata/out.$fname
 fi
 
+grep '# [67](K [67]' outdata/out.timings.t16.sw1024.K12.data
 python timings.py outdata/$fname.pthread &
 python timings.py outdata/$fname.omp

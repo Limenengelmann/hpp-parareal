@@ -10,29 +10,32 @@ ASMFLAGS = -fverbose-asm
 LDFLAGS = $(PFLAGS) -lm -lpthread
 
 RM = rm -f
-OBJS = main.o parareal.o tests.o aux.o
+OBJS = main.o parareal.o funcs.o aux.o
 NAME = main
 
-main: $(OBJS)
+main: $(OBJS) outdata
 	$(LD) $(OPT) $(OBJS) $(LDFLAGS) -o $@
 
-main.o: main.c tests.h parareal.h aux.h
+main.o: main.c funcs.h parareal.h aux.h
 	$(CC) $(CFLAGS) -c main.c
 
-tests.o: tests.h parareal.h aux.h tests.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -c tests.c
+funcs.o: funcs.h parareal.h aux.h funcs.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -c funcs.c
 
 aux.o: aux.c
 	$(CC) $(CFLAGS) -c aux.c
 
-parareal.o: parareal.h tests.h aux.h parareal.c
+parareal.o: parareal.h funcs.h aux.h parareal.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c parareal.c
+
+outdata:
+	mkdir outdata
 
 debug%:
 	# only change flag if valid call
 	if [ ! -z $* ]; then \
 		echo "debug = $*"; \
-		sed -i "/#define DEBUGGING/ s/[0-9][0-9]*/$*/" tests.h; \
+		sed -i "/#define DEBUGGING/ s/[0-9][0-9]*/$*/" aux.h; \
 	fi
 
 # produce assembler output

@@ -1,36 +1,12 @@
 #include "parareal.h"
 
 extern double g_tic;    // global time reference point
+extern FILE* gtimings;  // close open file on interrupt
 
-inline double fw_euler_step(double t, double y_t, double h, rhs_func f) {
-    DEBUG(DBRNDSLEEP_FWE, SLEEPTIME((t+0.5)*2));
-    return y_t + h*f(t, y_t);
-}
-
-inline double rk4_step(double t, double y_t, double h, rhs_func f) {
-    double k1 = f(t, y_t);
-    double k2 = f(t+h/2, y_t + h*k1/2);
-    double k3 = f(t+h/2, y_t + h*k2/2);
-    double k4 = f(t+h, y_t+h*k3);
-    DEBUG(DBRNDSLEEP_RK4, SLEEPTIME((t+0.5)*8));
-    return y_t + h/6*(k1 + 2*k2 + 2*k3 + k4);
-}
-
-typedef struct task_data {
-    double t0, y0, hc, hf;
-    double *y_next;
-    int nfine, ncoarse, id, piters;
-    volatile char *progress;    // pointer to volatile char
-    rhs_func f;
-    singlestep_func fine;
-    singlestep_func coarse;
-    FILE* timings;
-} task_data;
-
-void* task(void* args) {
+static void* pipel_task(void* args) {
     struct timespec w_tic;
     double tic = gtoc();
-    task_data* td = (task_data*) args;
+    pipel_task_data* td = (pipel_task_data*) args;
 
     double y_coarse, y_fine, y_next;
     double hc = td->hc;
@@ -101,8 +77,7 @@ void* task(void* args) {
 // TODO plot idea: speedup vs relative serial work/total work
 // TODO proper malloc/free symmetry by passing buffers as arguments
 // TODO add numthreads as arg
-extern FILE* gtimings;
-double* parareal(double start, double end, int ncoarse, int nfine, int num_threads,
+double* parareal_pthread(double start, double end, int ncoarse, int nfine, int num_threads,
         double y0, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
 
     // init time measurements
@@ -138,7 +113,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
     }
 
     pthread_t threads[num_threads];
-    task_data td[num_threads];
+    pipel_task_data td[num_threads];
 
     // TODO measure total waiting time (downtime) by increasing a counter
     // TODO how to give different colors for different timings
@@ -160,7 +135,7 @@ double* parareal(double start, double end, int ncoarse, int nfine, int num_threa
         td[i].piters = piters;
         td[i].progress = progress;
         td[i].timings = timings;
-        pthread_create(threads+i, NULL, task, (void*) &td[i]);
+        pthread_create(threads+i, NULL, pipel_task, (void*) &td[i]);
         t += slice;
     }
     DEBUG(DBTIMINGS, addTime2Plot(timings, id, 0, tic, gtoc()));
@@ -325,4 +300,96 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
     fclose(timings);
 
     return y;
+}
+
+static void* task(void* args) {
+    task_data* td = (task_data*) args;
+    double y_t = td->y_t;
+    for (int j=0; j<td->nfine; j++) {
+        y_t = td->fine(td->t, y_t, td->hf, td->f);
+        td->t += td->hf;
+    }
+    td->y_t = y_t;
+    return NULL;
+}
+
+double* parareal(double start, double end, int ncoarse, int nfine, 
+        int num_threads, double y_0, 
+        singlestep_func coarse, singlestep_func fine, 
+        rhs_func f, int piters) {
+
+    double slice = (end-start)/num_threads;
+    double hc = slice/ncoarse;
+    double hf = slice/nfine;
+    // +1 to account for y_0
+    double *y_t_old  = (double*) malloc((num_threads+1)*sizeof(double));
+    double *y_t_new  = (double*) malloc((num_threads+1)*sizeof(double));
+    double *y_t_fine = (double*) malloc((num_threads+1)*sizeof(double));
+
+    y_t_old[0]  = y_0;
+    y_t_new[0]  = y_0;
+    y_t_fine[0] = y_0;
+
+    double y_new, y_old = y_0;
+    double t = start;
+    // Initial approximation
+    for (int i=0; i<num_threads; i++) {
+        for(int j=0; j<ncoarse; j++) {
+            y_old = coarse(t, y_old, hc, f);
+            t += hc;
+        }
+        y_t_old[i+1] = y_old;
+    }
+    //gnuplot();
+
+    // parareal iteration
+    for (int K=0; K<piters; K++) {
+        // parallel fine steps
+        t = start;
+
+        pthread_t threads[num_threads];
+        task_data td[num_threads];
+
+        for(int i = 0; i < num_threads; i++) {
+            td[i].t = t;
+            td[i].y_t = y_t_old[i];
+            td[i].hf = hf;
+            td[i].nfine = nfine;
+            td[i].f = f;
+            td[i].fine = fine;
+            td[i].id = i;
+            pthread_create(threads+i, NULL, task, (void*) &td[i]);
+            t += slice;
+        }
+
+        for (int i=0; i<num_threads; i++) {
+            pthread_join(threads[i], NULL);
+            y_t_fine[i+1] = td[i].y_t;
+        }
+
+        //write2file(start, slice, num_threads+1, y_t_fine);
+        //char b;
+        //scanf("%c", &b);
+
+
+        // corrections and sequential coarse steps
+        // TODO currently limited to 1 step for coarse update
+        t = start;
+        for (int i=0; i<num_threads; i++) {
+            y_new = y_t_new[i];
+            y_old = y_t_old[i];
+            for (int j=0; j<ncoarse; j++) {
+                y_new = coarse(t, y_new, hc, f);
+                y_old = coarse(t, y_old, hc, f);
+                t += hc;
+            }
+            y_t_new[i+1] = y_new + y_t_fine[i+1] - y_old;
+        }
+        // new -> old
+        memcpy(y_t_old+1, y_t_new+1, num_threads*sizeof(double));
+    }
+    free(y_t_old );
+    free(y_t_fine);
+
+    return y_t_new;
 }

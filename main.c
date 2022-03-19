@@ -3,7 +3,7 @@
 #include <math.h>
 #include <signal.h>
 #include "parareal.h"
-#include "tests.h"
+#include "funcs.h"
 #include "aux.h"
 
 extern double g_tic;    // global time reference point
@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 #endif
+
     if (argc < 2) {
         printf("Usage: %s num_threads [coarse-steps-per-interval] [parareal-iters]\n", argv[0]);
         return -1;
@@ -46,23 +47,26 @@ int main(int argc, char** argv) {
 
     signal(SIGINT, graceful_death);  // exit gracefully on SIGINT
 
+    // Timing variables
     struct timespec w_tic;
     double tic;
     g_tic = tic();  // start global timer
 
-    const int pwork = 1<<10;  // Total work to be parallelized
-    int nfine   = round(pwork/num_threads);
+    // Algorithm variables
+    const int pwork = 1<<10;        // total work to be parallelized
+    int nfine       = round(pwork/num_threads);
     assert(fabs(nfine*num_threads - pwork) < 1e-15 && "Parallel Work not dividable by num_threads");
+    double y_0      = 1;            // initial value
+    double t_start  = 0;            // start time
+    double t_end    = 1;            // end time
+    double slice    = (t_end - t_start)/num_threads;
+    double t;                       // time variable
+    double hf       = slice/nfine;  // fine-integrator stepsize                  
 
-    double y_0 = 1;
-    double t_start = 0;
-    double t_end   = 1;
-    double slice = (t_end - t_start)/num_threads;
-    double t;
 
-    //double hc = slice/ncoarse;    // unused
-    double hf = slice/nfine;
-
+    /*
+     * Benchmark start
+     */
     tic();
     double* y_res = parareal(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
     double time_para = toc();
@@ -71,7 +75,7 @@ int main(int argc, char** argv) {
     double* y_res_omp = parareal_omp(t_start, t_end, ncoarse, nfine, num_threads, y_0, fw_euler_step, rk4_step, f_id, piters);
     double time_para_omp = toc();
 
-
+    // serial solve with fine integrator
     t = t_start;
     double y_t = y_0;
     tic();
@@ -81,6 +85,7 @@ int main(int argc, char** argv) {
     }
     double time_serial = toc();
 
+    // calculate l2 errors
     double l2err = 0;
     double l2err_omp = 0;
     double tmp = -1;
@@ -90,7 +95,7 @@ int main(int argc, char** argv) {
         l2err += tmp*tmp;
         tmp = fabs(y_res_omp[i] - exp(t));
         l2err_omp += tmp*tmp;
-        printf("Error[%d] : %.2e\n", i, tmp);
+        DPRINTF(1, "Error[%d] : %.2e\n", i, tmp);
         t += slice;
     }
 
