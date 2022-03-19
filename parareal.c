@@ -42,7 +42,6 @@ static void* pipel_task(void* args) {
         DEBUG(DBRNDSLEEP_IND, SLEEPTIME(td->ncoarse));
         DEBUG(DBTIMINGS, addTime2Plot(td->timings, td->id, 1, tic, gtoc()));
 
-        // FIXME race condition for 8 threads 85 steps 3 iterations
         // provoke racing conditions or lapping
 
         // wait for previous thread to finish iteration and update y_next

@@ -3,12 +3,14 @@
 double g_tic = 0;   // global time reference point
 extern double g_tic;
 
-void write2file(double start, double h, int size, double *yt) {
-    FILE* fp = fopen("./outdata/data.out", "w");
+void write2file(double start, double h, int size, double *yt, int type) {
+    char fname[128];
+    sprintf(fname, "./outdata/data.%d.out", type);
+    FILE* fp = fopen(fname, "a");
     assert(fp && "Open failed\n");
 
     for(int i=0; i<size; i++) {
-        fprintf(fp, "%.4f %.4f\n", start+i*h, yt[i]);
+        fprintf(fp, "%.4f %.4f\n", start+i*h, yt[i], type);
     }
     fclose(fp);
 }
