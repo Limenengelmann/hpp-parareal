@@ -76,7 +76,7 @@ void* task(void* args) {
         //if (td->id == 7) sleep(1);  // -> threads lap thread 7
         
         DEBUG(DBTIMINGS, tic = gtoc());
-        DEBUG(DBRNDSLEEP_DEP, SLEEPTIME(td->ncoarse));
+        DEBUG(DBRNDSLEEP_DEP, SLEEPTIME(5*td->ncoarse));
         // serial coarse propagation step + parareal update
         y_next = td->y_next[td->id];    // TODO guarantee y_next is uptodate (sync)
         y0 = y_next;                   // update next starting value
@@ -282,17 +282,18 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
             //#pragma omp for ordered schedule(static)      // gives correct result
             #pragma omp for ordered nowait schedule(static) // sometimes wrong result
             for (int p=0; p<P; p++) {
-                DEBUG(DBTIMINGS, tic = gtoc());
-                DPRINTF(DBTHREADS, "#%d: Starting iter %d.\n", p, k);
-                double t = slice*p;
                 omp_set_lock(locks+p);
+                DEBUG(DBTIMINGS, tic = gtoc());
+                DPRINTF(DBTHREADS, "#%2d: Starting iter %d.\n", p, k);
+                double t = slice*p;
                 for (int i=0; i<nfine; i++) {
                     y[p] = fine(t, y[p], hf, f);
                     t += hf;
                 }
                 dy[p] = y[p] - yc[p];
                 omp_unset_lock(locks+p);
-                DPRINTF(DBTHREADS, "#%d(K%d): Fine steps done.\n", p, k);
+                DPRINTF(DBTHREADS, "#%2d(K%2d): Fine steps done. (dy[%2d] = y[%2d] - yc[%2d])\n", p, k, p, p, p);
+                // TODO move sleep into lock for fairer comparison
                 DEBUG(DBRNDSLEEP_IND, SLEEPTIME(ncoarse));
                 DEBUG(DBTIMINGS, addTime2Plot(timings, p, 1, tic, gtoc()));
                 #pragma omp ordered
@@ -310,11 +311,13 @@ double* parareal_omp(double start, double end, int ncoarse, int nfine, int num_t
                         yc[p] = coarse(t, yc[p], hc, f);
                         t += hc;
                     }
-                    DPRINTF(DBTHREADS, "#%d(K%d): Updating y.\n", p, k);
+                    DPRINTF(DBTHREADS, "#%2d(K%2d): Coarse updt done.(yc[%2d] <-    coarse(y[%2d] up-to-date)\n", p, k, p, p);
                     omp_set_lock(locks+p+1);
                     y[p+1] = yc[p] + dy[p];
-                    omp_unset_lock(locks+p+1);
+                    DPRINTF(DBTHREADS, "#%2d(K%2d): Updated            y[%2d] = yc[%2d] + dy[%2d]. (yc[%2d], dy[%2d] now stale).\n", p, k, p+1, p, p, p+1, p+1);
                     DEBUG(DBTIMINGS, addTime2Plot(timings, p, 2, tic, gtoc()));
+                    omp_unset_lock(locks+p+1);
+                    DPRINTF(DBTHREADS, "#%2d(K%2d): iter done.\n", p, k);
                 }
             }
         }

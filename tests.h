@@ -19,9 +19,9 @@
 #define DBMAIN_TESTS    0
 #define DBPARAPLOT      0
 #define DBTIMINGS       1
-#define DBTHREADS       0
-#define DBRNDSLEEP_INI  1
-#define DBRNDSLEEP_IND  1
+#define DBTHREADS       1
+#define DBRNDSLEEP_INI  0
+#define DBRNDSLEEP_IND  0
 #define DBRNDSLEEP_DEP  1
 #define DBRNDSLEEP_RK4  0
 #define DBRNDSLEEP_FWE  0

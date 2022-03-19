@@ -29,7 +29,7 @@ print("number of arguments: ", len(sys.argv))
 data = np.loadtxt(fname)
 
 colors = ['red', 'green', 'blue']
-labels = [' setup', ' serial work', ' parallel work']
+labels = [' init', ' indep. part', ' dep. part']
 lines = [0,0,0];
 
 
@@ -38,7 +38,9 @@ fig, ax = plt.subplots()
 for i in range(0, len(data), 2):
     l = np.ubyte(data[i, 2])
     # -data[0,0] to start time from 0
-    lines[l], = ax.plot(data[i:i+2,0]-data[0,0], data[i:i+2, 1], colors[l], linewidth=20, solid_capstyle='butt')
+    lines[l], = ax.plot(data[i:i+2,0]-data[0,0], data[i:i+2, 1], color=colors[l], linewidth=20, solid_capstyle='butt')
+    if l==2:    # new iteration starts
+        ax.plot(data[i+1, 0]-data[0,0], data[i+1,1], marker="|", color='black', ms=40, solid_capstyle='butt')
 
 for i in range(0, 3):
     lines[i].set_label(labels[i])

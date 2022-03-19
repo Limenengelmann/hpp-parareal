@@ -21,10 +21,14 @@ fi
 #    echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
 #done
 t=16
+sw=128
+K=4
+# makes omp fail because of lapping
+t=16
 sw=1024
 K=12
 fname=timings.t$t.sw$sw.K$K.data
-if [ ! -e asdlkgjasdlgkjasdglkjoutdata/out.$fname ]; then
+if [ ! -e a.outdata/out.$fname ]; then
     main $t $sw $K | tee outdata/out.$fname
 fi
 
