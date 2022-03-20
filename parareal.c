@@ -74,11 +74,12 @@ static void* pipel_task(void* args) {
 void parareal_pthread(double start, double end, int ncoarse, int nfine, int num_threads,
         double y0, double* y_next, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
 
+    FILE* timings = NULL;
 #if DBTIMINGS
     // init time measurements
     char fname[128];
     sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.pthread", num_threads, ncoarse, piters);
-    FILE* timings = fopen(fname, "w");
+    timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
         exit(-1);
@@ -177,22 +178,25 @@ void parareal_pthread(double start, double end, int ncoarse, int nfine, int num_
         pthread_join(threads[i], NULL);
     }
 
-    fclose(timings);
+    if (timings) fclose(timings);
 }
 
 void parareal_omp(double start, double end, int ncoarse, int nfine, int num_threads,
         double y0, double *y, singlestep_func coarse, singlestep_func fine, rhs_func f, int piters) {
 
+    FILE* timings = NULL;
+    struct timespec w_tic;
+    double tic;
+
 #if DBTIMINGS
     char fname[128];
     sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.omp", num_threads, ncoarse, piters);
-    FILE* timings = fopen(fname, "w");
+    timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
         exit(-1);
     }
-    struct timespec w_tic;
-    double tic = gtoc();
+    tic = gtoc();
 #endif
 
     double *yc = (double*) malloc((num_threads+1)*sizeof(double)); // coarse solution
@@ -284,7 +288,7 @@ void parareal_omp(double start, double end, int ncoarse, int nfine, int num_thre
         }
     }
 
-    fclose(timings);
+    if (timings) fclose(timings);
     free(yc);
     free(dy);
 }
@@ -309,11 +313,11 @@ void parareal(double start, double end, int ncoarse, int nfine,
         int num_threads, double y_0, double* y_t_new,
         singlestep_func coarse, singlestep_func fine, 
         rhs_func f, int piters) {
-
+    FILE* timings = NULL;
 #if DBTIMINGS
     char fname[128];
     sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.pthread", num_threads, ncoarse, piters);
-    FILE* timings = fopen(fname, "w");
+    timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
         exit(-1);
@@ -395,6 +399,7 @@ void parareal(double start, double end, int ncoarse, int nfine,
         memcpy(y_t_old+1, y_t_new+1, num_threads*sizeof(double));
         DEBUG(DBTIMINGS, addTime2Plot(timings, id, 2, tic, gtoc()));
     }
+    if (timings) fclose(timings);
     free(y_t_old );
     free(y_t_fine);
 }
