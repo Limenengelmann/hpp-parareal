@@ -316,7 +316,7 @@ void parareal(double start, double end, int ncoarse, int nfine,
     FILE* timings = NULL;
 #if DBTIMINGS
     char fname[128];
-    sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.pthread", num_threads, ncoarse, piters);
+    sprintf(fname, "outdata/timings.t%d.sw%d.K%d.data.vanilla", num_threads, ncoarse, piters);
     timings = fopen(fname, "w");
     if (! timings) {
         perror("Couldn't open timings.data");
@@ -369,7 +369,7 @@ void parareal(double start, double end, int ncoarse, int nfine,
             td[i].nfine = nfine;
             td[i].f = f;
             td[i].fine = fine;
-            td[i].id = i;
+            td[i].id = i+1;
             td[i].timings = timings;
             pthread_create(threads+i, NULL, task, (void*) &td[i]);
             t += slice;

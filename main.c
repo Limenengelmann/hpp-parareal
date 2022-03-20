@@ -109,6 +109,10 @@ int main(int argc, char** argv) {
         t += slice;
     }
 
+    l2err = sqrt(l2err);
+    l2err_pt = sqrt(l2err_pt);
+    l2err_omp = sqrt(l2err_omp);
+
     double speedup = time_serial/time_para;
     double speedup_pt = time_serial/time_para_pt;
     double speedup_omp = time_serial/time_para_omp;

@@ -1,7 +1,5 @@
 #!/usr/local/bin/bash
 
-# constant variables
-
 ### make executables
 make debug1 main
 
@@ -20,18 +18,15 @@ fi
 #    done
 #    echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
 #done
-t=16
-sw=128
-K=4
+
 # makes omp fail because of lapping
 t=16
 sw=1024
 K=12
+# warning: this will take a LONG time for the vanilla algorithm! Better comment it out.
 fname=timings.t$t.sw$sw.K$K.data
-if [ ! -e outdata/out.$fname ]; then
-    main $t $sw $K | tee outdata/out.$fname
-fi
+./main $t $sw $K | tee outdata/out.$fname
 
-grep '# [67](K [67]' outdata/out.timings.t16.sw1024.K12.data
+# needs matplotlib and numpy
 python timings.py outdata/$fname.pthread &
 python timings.py outdata/$fname.omp

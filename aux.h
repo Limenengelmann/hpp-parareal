@@ -16,7 +16,7 @@
 /*
  * DEBUG Macros
  */
-#define DEBUGGING       0
+#define DEBUGGING       1
 
 // debug sections
 #define DBTESTS         0
@@ -27,8 +27,8 @@
 
 // randomize workload in different code sections
 #define DBRNDSLEEP_INI  0
-#define DBRNDSLEEP_IND  0
-#define DBRNDSLEEP_DEP  0
+#define DBRNDSLEEP_IND  1
+#define DBRNDSLEEP_DEP  1
 #define DBRNDSLEEP_RK4  0
 #define DBRNDSLEEP_FWE  0
 #define SLEEPTIME(n) usleep(rand()%lround((n)*F_WORK/2))

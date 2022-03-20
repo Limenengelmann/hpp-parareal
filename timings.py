@@ -45,13 +45,14 @@ for i in range(0, len(data), 2):
 for i in range(0, 3):
     lines[i].set_label(labels[i])
 
-leg = plt.legend(bbox_to_anchor=(1,1), loc="upper left", fontsize=15)
+leg = plt.legend(bbox_to_anchor=(0.85,0.25), loc="center left", fontsize=15)
 for l in leg.get_lines():
     l.set_linewidth(4.0)
 
-plt.xlabel('time in s')
-plt.ylabel('thread id')
-plt.yticks(np.arange(0, num_threads, 1.0))
-plt.title(f"{ptype}: K{piters}, sw{sw}")
+plt.xlabel('time in s', fontsize=15)
+plt.ylabel('thread id', fontsize=15)
+plt.yticks(np.arange(0, max(data[:, 1])+1, 1.0))
+plt.title(f"{ptype}: K{piters}, sw{sw}", fontsize=15)
 
+plt.savefig(f"work.{ptype}.K{piters}.sw{sw}.png", bbox_inches="tight")
 plt.show()
